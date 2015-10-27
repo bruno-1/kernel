@@ -32,6 +32,7 @@ hlpmsg      db      `Monitor Commands:\r\n`
             db      `  Q           - Quit monitor\r\n`
             db      `  M           - Show non-kernel page table entries\r\n`
             db      `  C           - Release allocated pages (except kernel)\r\n`
+            db      `  S           - Print memory access statistics\r\n`
             db      `  D ADDR NUM  - Dump NUM words beginning at address ADDR\r\n`
             db      `  X ADDR NUM  - Calculate CRC32 for NUM words starting at address ADDR\r\n`
             db      `  P ADDR      - Invalidate TLB entry for virtual address ADDR\r\n`
@@ -56,7 +57,22 @@ pagemsg     db      `________: ________ ____\r\n`
 pagemsg_len equ $-pagemsg
 
         ALIGN 4
-mon_addr    dd    0
+statmsg     db      `#RD: `
+rdcntstr    db      `________\r\n`
+            db      `#WR: `
+wrcntstr    db      `________\r\n`
+statmsg_len equ $-statmsg
+
+
+;==================================================================
+; S E C T I O N   B S S
+;==================================================================
+        SECTION         .bss
+
+        ALIGN 4
+mon_addr    resd    1
+mon_rd_cnt  resd    1
+mon_wr_cnt  resd    1
 
 
 ;==================================================================
@@ -114,6 +130,12 @@ run_monitor:
         call    check_cpuid
 
         ;----------------------------------------------------------
+        ; clear data read/write counters
+        ;----------------------------------------------------------
+        mov     dword [mon_rd_cnt], 0
+        mov     dword [mon_wr_cnt], 0
+
+        ;----------------------------------------------------------
         ; setup GS segment register for linear addressing
         ;----------------------------------------------------------
         mov     ax, linDS
@@ -143,6 +165,8 @@ run_monitor:
         je      .mappedpages
         cmp     al, 'C'
         je      .releasepages
+        cmp     al, 'S'
+        je      .printstats
         cmp     al, '#'
         je      .loop
         ;----------------------------------------------------------
@@ -189,6 +213,10 @@ run_monitor:
 
         ; read value to write into address
         call    hex2int
+        ;----------------------------------------------------------
+        ; perform write access and update write counter
+        ;----------------------------------------------------------
+        inc     dword [mon_wr_cnt]
         mov     [gs:edi], eax
         jmp     .loop
 .readaddr:
@@ -204,6 +232,10 @@ run_monitor:
         mov     ecx, 8                  ; number of output digits
         call    int_to_hex
 
+        ;----------------------------------------------------------
+        ; perform read access and update read counter
+        ;----------------------------------------------------------
+        inc     dword [mon_rd_cnt]
         mov     edi, [ebp-260]
         mov     eax, [gs:edi]
 
@@ -216,7 +248,7 @@ run_monitor:
         call    screen_write
         jmp     .loop
 .crcaddr:
-        cmp     byte [cpuid_sse42_avail],1
+        cmp     byte [cpuid_sse42_avail], 1
         jne     .loop
 
         inc     esi
@@ -301,6 +333,9 @@ run_monitor:
 .releasepages:
         call    freeAllPages
         jmp     .loop
+.printstats:
+        call    print_stats
+        jmp     .loop
 .pginvaddr:
         inc     esi
         call    hex2int
@@ -356,7 +391,7 @@ dump_memory:
         mov     byte [esi+ecx-1], ` `
 .dumpfinished:
         pop     gs
-        popad
+        popa
         leave
         ret
 
@@ -409,7 +444,31 @@ print_mapped_pages:
         cmp     ecx,1024
         jb      .pdeloop
 
-        popad
+        popa
+        leave
+        ret
+
+
+        GLOBAL print_stats:function
+print_stats:
+        enter   0,0
+        pusha
+
+        mov     eax, [mon_rd_cnt]
+        lea     edi, [rdcntstr]
+        mov     ecx,8                   ; number of hex digits
+        call    int_to_hex
+
+        mov     eax, [mon_wr_cnt]
+        lea     edi, [wrcntstr]
+        mov     ecx,8                   ; number of hex digits
+        call    int_to_hex
+
+        lea     esi, [statmsg]          ; message-offset
+        mov     ecx, statmsg_len        ; message-length
+        call    screen_write
+
+        popa
         leave
         ret
 
@@ -449,7 +508,7 @@ print_mapped_addr:
         mov     ecx, pagemsg_len        ; message-length
         call    screen_write
 
-        popad
+        popa
         leave
         ret
 
