@@ -334,11 +334,16 @@ dump_memory:
         jne     .Ldumploop
         andl    $3, %edx
         jz      .Ldumpfinished
+        #----------------------------------------------------------
+        # incomplete 4-numbers block
+        # each block contains 9 characters, including
+        # trailing space
+        #----------------------------------------------------------
+        leal    1(%edx,%edx,8), %ecx   # message length
+        movw    $0x0a0d, -2(%esi,%ecx,1) # append "\r\n" to line
         movl    %esi, %edi
-        leal    (%edx,%edx,8), %ecx   # message length
-        movb    $'\n', -1(%esi,%ecx,1)
         call    screen_write
-        movb    $' ', -1(%esi,%ecx,1)
+        movb    $' ', -2(%esi,%ecx,1)
 .Ldumpfinished:
         popl    %gs
         popal
