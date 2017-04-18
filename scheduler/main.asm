@@ -18,7 +18,7 @@ SECTION .data
 
 ; Time output string
 string db "'Timestamp': "
-ascii_hex db "       0"
+ascii_dec db "         0"
 db 13 ; newline
 ; Time output string-length
 string_length EQU $-string
@@ -35,8 +35,7 @@ BITS 32
 ;------------------------------------------------------------------
 
 ; Converter "Syscall"
-EXTERN uint32_to_dec ; not working, why?
-EXTERN int32_to_hex
+EXTERN uint32_to_dec
 
 ;------------------------------------------------------------------
 ; M A I N   F U N C T I O N
@@ -56,9 +55,9 @@ main:
 	; Convert to ASCII timestamp
 	;----------------------------------------------------------
 .timeconvert:
-	MOV edi, ascii_hex
+	MOV edi, ascii_dec
 	MOV cx, 0x000A
-	CALL int32_to_hex
+	CALL uint32_to_dec
 
 	;----------------------------------------------------------
 	; Print string syscall

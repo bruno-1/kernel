@@ -26,7 +26,7 @@ $(PROG).flp : $(PROG).bin $(BOOTLOADER)
 
 $(PROG).elf : $(PROG).o $(LIBKERNEL) $(OBJS) $(LDSCRIPT)
 	@echo LD -o $@
-	@$(LD) $(LDFLAGS) --build-id=md5 -Map=$(PROG).map --cref $< -T $(LDSCRIPT) -o $@ $(LIBKERNEL) $(OBJS)
+	@$(LD) $(LDFLAGS) --build-id=md5 -Map=$(PROG).map --cref $< -T $(LDSCRIPT) -o $@ $(OBJS) $(LIBKERNEL)
 
 
 $(PROG).o : ../inc/comgdt.inc
