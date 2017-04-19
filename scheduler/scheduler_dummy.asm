@@ -85,7 +85,8 @@ scheduler_newTask:
 	MOV DWORD [next_PCB], eax
 
 	; Return PID
-	MOV eax, DWORD [ebx+PCB.PID]
+	MOV eax, DWORD [ebx+PCB_list.PCB_ptr]
+	MOV eax, DWORD [eax+PCB.PID]
 	POP ebx
 
 	; Cleanup
@@ -101,6 +102,7 @@ scheduler_newTask:
 ;   Rewrite as INT 0x80 function later (check that only children can be killed)
 ;------------------------------------------------------------------
 GLOBAL scheduler_killTask
+;===================================================================================================== UNTESTED
 scheduler_killTask:
 	; Stackframe setup
 	ENTER 0, 0
@@ -147,6 +149,7 @@ scheduler_killTask:
 ;   Rewrite as INT 0x80 function exit() later
 ;------------------------------------------------------------------
 GLOBAL scheduler_exit
+;===================================================================================================== UNTESTED
 scheduler_exit:
 	; Get current PID ans set status to not running
 	MOV ebx, DWORD [active_PCB]

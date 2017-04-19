@@ -70,7 +70,7 @@ GLOBAL context_new
 context_new:
 	; Stackframe setup
 	ENTER 0, 0
-	PUSHAD
+	PUSH ebx
 
 	; Setup new PCB
 	MOV ebx, DWORD [pcbbuffer_ptr]
@@ -122,7 +122,8 @@ context_new:
 	MOV DWORD [ebx+PCB.reg_gs], eax
 
 	; Cleanup
-	POPAD
+	MOV eax, ebx
+	POP ebx
 	LEAVE
 	RET
 
@@ -133,6 +134,7 @@ context_new:
 ;   eax      0 on success
 ;------------------------------------------------------------------
 GLOBAL context_del
+;===================================================================================================== UNTESTED
 context_del:
 	; Stackframe setup
 	ENTER 0, 0
@@ -170,7 +172,9 @@ context_switch:
 	MOV DWORD [ebx+PCB.reg_eax], eax
 	MOV DWORD [ebx+PCB.reg_ecx], ecx
 	MOV DWORD [ebx+PCB.reg_edx], edx
-	MOV DWORD [ebx+PCB.reg_esp], esp
+	MOV eax, esp
+	ADD eax, 12 ; Correction for elements on stack inside context_switch
+	MOV DWORD [ebx+PCB.reg_esp], eax
 	MOV DWORD [ebx+PCB.reg_ebp], ebp
 	MOV DWORD [ebx+PCB.reg_esi], esi
 	MOV DWORD [ebx+PCB.reg_edi], edi
@@ -227,7 +231,6 @@ context_set:
 	MOV gs, bx
 	MOV ebx, DWORD[eax+PCB.reg_ss]
 	MOV ss, bx
-
 
 	; Special registers
 	MOV esp, DWORD[eax+PCB.reg_esp]

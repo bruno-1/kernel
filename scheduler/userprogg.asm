@@ -6,6 +6,12 @@
 ;-----------------------------------------------------------------
 
 ;==================================================================
+; C O N S T A N T S
+;==================================================================
+
+DELAY EQU 0x1000000 ; ~16,7M cycles
+
+;==================================================================
 ; S E C T I O N   D A T A
 ;==================================================================
 
@@ -74,14 +80,14 @@ EXTERN uint32_to_dec
 	XOR ecx, ecx
 	%%waste_time_loop1:
 	INC ecx
-	CMP ecx, 0x1000000+%1 ; ~16,7M cycles
+	CMP ecx, DELAY+%1
 	JNE %%waste_time_loop1
 
 	; Yield for other tasks
 	CALL scheduler_yield
 
 	; Sanity check
-	CMP ecx, 0x1000000+%1 ; ~16,7M cycles
+	CMP ecx, DELAY+%1
 	JNE %%end_progg
 
 	; Waste more time

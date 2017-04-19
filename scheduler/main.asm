@@ -89,10 +89,10 @@ main:
 	; Print Process IDs
 	;----------------------------------------------------------
 	
-.print_next:
 	; Prepare print loop
 	XOR ecx, ecx
 	MOV cl, "A"
+.print_next:
 	PUSH ecx
 
 	; Prepare text
