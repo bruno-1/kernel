@@ -20,6 +20,7 @@ PIDa dd 0
 PIDb dd 0
 PIDc dd 0
 PIDd dd 0
+PIDe dd 0
 
 ;------------------------------------------------------------------
 ; S T R I N G S
@@ -55,6 +56,7 @@ EXTERN proggA
 EXTERN proggB
 EXTERN proggC
 EXTERN proggD
+EXTERN proggE
 
 ;------------------------------------------------------------------
 ; M A I N   F U N C T I O N
@@ -83,6 +85,10 @@ main:
 	MOV DWORD [ebp], eax
 	CALL scheduler_newTask
 	MOV DWORD [PIDd], eax
+	MOV eax, proggE
+	MOV DWORD [ebp], eax
+	CALL scheduler_newTask
+	MOV DWORD [PIDe], eax
 	ADD esp, 4
 
 	;----------------------------------------------------------
@@ -112,7 +118,7 @@ main:
 	; Next iteration
 	POP ecx
 	INC ecx
-	CMP cl, "D"
+	CMP cl, "E"
 	JLE .print_next
 
 	;----------------------------------------------------------
