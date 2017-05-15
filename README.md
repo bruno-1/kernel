@@ -37,10 +37,15 @@ a mapping of virtual memory areas to corresponding physical addresses:
   and the stack area are mapped to physical memory starting at
   address 0x200000
 
-
 # pmhello
 This program shows the transition from x86 real-mode to protected-mode
 and prints a simple welcome message to the screen. Finally, the program
 triggers a General Protection Fault (int#14) exception by raising an
 unhandled interrupt. The exception handler prints the contents of all
 registers, including the address of the faulting instruction.
+
+# scheduler
+This program demonstrates task scheduling on x86 processors. It contains
+multiple examples which show the different aspects of the scheduling
+algorithm for creating, executing and killing new or existing tasks.
+
