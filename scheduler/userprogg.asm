@@ -76,6 +76,11 @@ EXTERN uint32_to_dec
 	INT 0x80
 	POP eax
 
+	; Syslog text
+	MOV edx, %1-'A'
+	MOV eax, 103
+	INT 0x80
+
 	; Waste time
 	XOR ecx, ecx
 	%%waste_time_loop1:

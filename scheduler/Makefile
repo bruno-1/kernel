@@ -12,7 +12,7 @@ BOOTLOADER  = $(BOOTDIR)/bootload.bin
 LIBKERNEL   = ../libkernel/libkernel.a
 LDSCRIPT    = ldscript
 PROG        = scheduler
-OBJS        = context.o scheduler_dummy.o userprogg.o main.o
+OBJS        = syslog.o context.o scheduler_dummy.o userprogg.o main.o
 
 TARGETS     = $(PROG).flp
 

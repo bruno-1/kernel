@@ -30,6 +30,10 @@ sys_call_table:
         .long   do_nothing   # 11
         .long   do_nothing   # 12
         .long   sys_time     # 13
+.rept	89
+        .long   do_nothing   # 14 to 102
+.endr
+        .long   sys_syslog   # 103
         .equ    N_SYSCALLS, (.-sys_call_table)/4
 #------------------------------------------------------------------
         .align   16
@@ -117,4 +121,10 @@ sys_time:       # time system call
 
         popl    %ds
         iret                    # resume the calling task
+
+#------------------------------------------------------------------
+        .align      8
+sys_syslog:       # for logging data to memory
+        .extern syslog
+        jmp     syslog
 

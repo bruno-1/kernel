@@ -52,10 +52,10 @@
         .quad   0x00409A010000FFFF      # code segment-descriptor
         #----------------------------------------------------------
         # Code/Data, 32 bit, Byte, Priv 0, Type 0x02, 'Read/Write'
-        # Base Address: 0x00020000   Limit: 0x0007FFFF
+        # Base Address: 0x00020000   Limit: 0x00000FFF*0x1000 -> 16MiB-4KiB
         .equ    privDS, (.-theGDT)+0    # selector for ring0 data
         .global privDS
-        .quad   0x004792020000FFFF      # data segment-descriptor
+        .quad   0x00C0920200000FFF      # data segment-descriptor
         #----------------------------------------------------------
         # Expand-Up Stack Segment Descriptor
         # Code/Data, 32 bit, Byte, Priv 0, Type 0x02, 'Read/Write'
