@@ -6,6 +6,7 @@
 ; INT 0x80
 ; eax = 103
 ; edx = Message-ID
+; edi = 4 chars to display (if not null)
 ;
 ;-----------------------------------------------------------------
 
@@ -14,6 +15,7 @@
 ;==================================================================
 
 STARTPOS EQU 0x200000 ; at 2 MiB (+ 128 KiB data segment offset) -> 0x220000
+NEWLINE EQU 10
 
 ;==================================================================
 ; S E C T I O N   D A T A
@@ -26,9 +28,22 @@ SECTION .data
 ;------------------------------------------------------------------
 
 ; message strings
-string_00 db "String A", 13
-string_01 db "String BB", 13
-string_02 db "String CCC", 13
+string_00 db ""
+string_01 db "-- Created new task"
+string_02 db "-- Failed to kill task"
+string_03 db "-- Killed task"
+string_04 db "-- Task exited"
+string_05 db "-- Failed to kill self"
+string_06 db "-- Task yielded"
+string_07 db "-- Task resumed"
+string_08 db "-- Scheduler started"
+string_09 db "## Created new context"
+string_10 db "## Deleted context"
+string_11 db "## Started context switch"
+string_12 db "## Stored context"
+string_13 db "## Set context"
+string_14 db "// Userprogg"
+string_15 db "\\ Idle task executed"
 string_last EQU $
 
 ;------------------------------------------------------------------
@@ -36,10 +51,10 @@ string_last EQU $
 ;------------------------------------------------------------------
 
 ; Shortcut string access
-stringtable dd string_00, string_01, string_02
+stringtable dd string_00, string_01, string_02, string_03, string_04, string_05, string_06, string_07, string_08, string_09, string_10, string_11, string_12, string_13, string_14, string_15
 
 ; String lengths
-stringlength dd string_01-string_00, string_02-string_01, string_last-string_02
+stringlength dd string_01-string_00, string_02-string_01, string_03-string_02, string_04-string_03, string_05-string_04, string_06-string_05, string_07-string_06, string_08-string_07, string_09-string_08, string_10-string_09, string_11-string_10, string_12-string_11, string_13-string_12, string_14-string_13, string_15-string_14, string_last-string_15
 
 ;------------------------------------------------------------------
 ; D A T A   S T O R E
@@ -75,6 +90,13 @@ syslog:
 	MOV ecx, DWORD [stringlength+4*edx]
 	TEST ecx, ecx
 	JZ .end_int ; string length is zero
+	INC ecx ; newline
+
+	; Add parameter to string
+	TEST edi, edi
+	JZ .no_param
+	ADD ecx, 5
+.no_param:
 
 	; Reserve memory for logging (synchronized)
 .lock_ptr_start:
@@ -90,14 +112,23 @@ syslog:
 	ADD DWORD [curr_ptr], ecx
 	MOV DWORD [lock_ptr], 0
 
+	; Process parameter
+	MOV BYTE [edx+ecx-1], NEWLINE
+	DEC ecx
+	TEST edi, edi
+	JZ .next_char
+	SUB ecx, 5
+	MOV BYTE [edx+ecx], ' '
+	MOV DWORD [edx+ecx+1], edi
+
 	; Actual logging
-.nect_char:
+.next_char:
 	MOV bl, BYTE [eax]
 	MOV BYTE [edx], bl
 	INC eax
 	INC edx
 	DEC ecx
-	JNZ .nect_char
+	JNZ .next_char
 
 	; End Interrupt
 .end_int:

@@ -45,6 +45,9 @@ BITS 32
 ; E X T E R N A L   F U N C T I O N S
 ;------------------------------------------------------------------
 
+; Syslog
+%INCLUDE 'syslog.inc'
+
 ; Scheduler
 %INCLUDE 'scheduler.inc'
 
@@ -77,9 +80,7 @@ EXTERN uint32_to_dec
 	POP eax
 
 	; Syslog text
-	MOV edx, %1-'A'
-	MOV eax, 103
-	INT 0x80
+	SYSLOG 14, ('    '+(%1-' '))
 
 	; Waste time
 	XOR ecx, ecx
@@ -156,6 +157,9 @@ proggE:
 	MOV eax, 0x04
 	INT 0x80
 	POP eax
+
+	; Syslog text
+	SYSLOG 14, 'E   '
 
 	; Waste time
 	MOV ecx, DELAY+5

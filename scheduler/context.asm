@@ -57,6 +57,13 @@ SECTION .text
 BITS 32
 
 ;------------------------------------------------------------------
+; E X T E R N A L   F U N C T I O N S
+;------------------------------------------------------------------
+
+; Syslog
+%INCLUDE 'syslog.inc'
+
+;------------------------------------------------------------------
 ; M A I N   F U N C T I O N S
 ;------------------------------------------------------------------
 
@@ -125,6 +132,7 @@ context_new:
 	MOV eax, ebx
 	POP ebx
 	LEAVE
+	SYSLOG 9
 	RET
 
 ;------------------------------------------------------------------
@@ -151,6 +159,7 @@ context_del:
 	; Cleanup
 .deleted:
 	LEAVE
+	SYSLOG 10
 	RET
 
 ;------------------------------------------------------------------
@@ -163,6 +172,7 @@ context_del:
 GLOBAL context_switch
 context_switch:
 	; Store all values
+	SYSLOG 11
 	PUSHFD
 	PUSH ebx
 	MOV ebx, DWORD [context_current_PCB]
@@ -203,6 +213,7 @@ context_switch:
 
 	; Set new context
 	MOV eax, DWORD [context_new_PCB]
+	SYSLOG 12
 	JMP context_set
 
 ;==================================================================
@@ -251,5 +262,6 @@ context_set:
 	MOV eax, DWORD[eax+PCB.reg_eax]
 
 	; Return to switched in context
+	SYSLOG 13
 	RET
 

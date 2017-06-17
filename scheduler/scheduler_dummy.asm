@@ -50,6 +50,9 @@ BITS 32
 ; E X T E R N A L   F U N C T I O N S
 ;------------------------------------------------------------------
 
+; Syslog
+%INCLUDE 'syslog.inc'
+
 ; Context functions
 %INCLUDE 'context.inc'
 
@@ -91,6 +94,7 @@ scheduler_newTask:
 
 	; Cleanup
 	LEAVE
+	SYSLOG 1
 	RET
 
 ;------------------------------------------------------------------
@@ -124,6 +128,7 @@ scheduler_killTask:
 
 	; One runthru done = fail
 	MOV eax, -1
+	SYSLOG 2
 	JMP .cleanup
 
 	; Kill found task
@@ -131,6 +136,7 @@ scheduler_killTask:
 	PUSH edx
 	CALL context_del
 	ADD esp, 4
+	SYSLOG 3
 
 	; Cleanup
 .cleanup:
@@ -172,10 +178,12 @@ scheduler_exit:
 	MOV DWORD [active_PCB], eax
 	MOV eax, DWORD [eax+PCB_list.PCB_ptr]
 	ADD esp, 4
+	SYSLOG 4
 	JMP context_set
 
 	; Halt system in case of error
 .error:
+	SYSLOG 5
 	CLI
 	HLT
 	JMP .error
@@ -212,7 +220,9 @@ scheduler_yield:
 	POPFD
 	
 	; Switch context
+	SYSLOG 6
 	CALL context_switch
+	SYSLOG 7
 	RET
 
 ;------------------------------------------------------------------
@@ -240,9 +250,11 @@ scheduler_start:
 	MOV DWORD [active_PCB], PCB_ptrs
 	MOV eax, DWORD [PCB_ptrs+PCB_list.PCB_ptr]
 	ADD esp, 4
+	SYSLOG 8
 	JMP context_set
 
 idle_task:
+	SYSLOG 15
 	CALL scheduler_yield
 	JMP idle_task
 
