@@ -55,7 +55,7 @@
 ; C O N S T A N T S
 ;==================================================================
 
-MAX_PCBS EQU 8
+MAX_PCBS EQU 128
 
 ;==================================================================
 ; S T R U C T U R E S
@@ -84,7 +84,6 @@ SECTION .data
 
 PCB_ptrs dd 1, 0, PCB_ptrs, PCB_ptrs
 	TIMES ((MAX_PCBS-1)*PCB_list.size) db 0
-next_PCB dd PCB_ptrs+PCB_list.size
 active_PCB dd 0
 
 ;==================================================================
@@ -112,21 +111,39 @@ BITS 32
 ; INPUT
 ;   ebx      Function address for new task
 ; RETURN
-;   eax      PID
-; REMARKS
-;   Implement dynamic search for free space in list (& dynamic list size?)
+;   eax      PID (0xFFFFFFFF on failure)
 ;------------------------------------------------------------------
 GLOBAL scheduler_newTask
 scheduler_newTask:
 	; Create new context ebx is passed thru
 	CALL context_new
+	TEST eax, eax
+	JNZ .success
+	SYSLOG 17
+	MOV eax, 0xFFFFFFFF
+	RET
+.success:
 
-	; Store context & advance next_PCB ptr -> unchecked if there still is free storage
-	MOV ebx, DWORD [next_PCB]
+	; Find first free space in list
+	MOV ebx, PCB_ptrs
+.search:
+	CMP DWORD [ebx+PCB_list.used], 0
+	JE .found
+	LEA ebx, [ebx+PCB_list.size]
+	JMP .search
+.found:
+
+	; Check if there is actually space available
+	CMP ebx, PCB_ptrs+(MAX_PCBS*PCB_list.size)
+	JB .space_available
+	SYSLOG 18
+	MOV eax, 0xFFFFFFFF
+	RET
+.space_available:
+
+	; Store context -> unchecked if there still is free storage
 	MOV DWORD [ebx+PCB_list.used], 1
 	MOV DWORD [ebx+PCB_list.PCB_ptr], eax
-	LEA eax, [ebx+PCB_list.size]
-	MOV DWORD [next_PCB], eax ; always uses next, free unused in between is skipped
 
 	; Close ring again
 	MOV eax, DWORD [PCB_ptrs+PCB_list.last]
@@ -261,6 +278,17 @@ scheduler_start:
 	; Setup idle task
 	MOV ebx, idle_task
 	CALL context_new
+	TEST eax, eax
+	JNZ .success
+
+	; Error creating idle PCB -> critical error
+	SYSLOG 18
+	CLI
+	HLT
+	JMP $
+.success:
+
+	; idle task modification
 	MOV DWORD [PCB_ptrs+PCB_list.PCB_ptr], eax
 	MOV DWORD [eax+PCB.PID], 0 ; Fake idle task ID to zero -> one arbitrary ID > 0 is never used
 

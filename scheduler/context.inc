@@ -12,7 +12,7 @@
 ; INPUT
 ;   ebx      Function address for new task
 ; RETURN
-;   eax      Pointer to PCB
+;   eax      Pointer to PCB (0 on failure)
 ;------------------------------------------------------------------
 EXTERN context_new
 
@@ -33,7 +33,7 @@ EXTERN context_del
 ;   eax      Pointer to new PCB
 ;   ebx      Pointer to currently running PCB
 ; RETURN
-;   none
+;   via context_set
 ;------------------------------------------------------------------
 EXTERN context_switch
 

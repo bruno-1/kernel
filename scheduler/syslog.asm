@@ -14,7 +14,7 @@
 ; C O N S T A N T S
 ;==================================================================
 
-STARTPOS EQU 0x200000 ; at 2 MiB (+ 128 KiB data segment offset) -> 0x220000
+STARTPOS EQU 0x800000 ; at 8 MiB (+ 128 KiB data segment offset) -> 0x820000
 NEWLINE EQU 10
 
 ;==================================================================
@@ -45,6 +45,9 @@ string_13 db "## Set context"
 string_14 db "// Userprogg"
 string_15 db "\\ Idle task executed"
 string_16 db "** Scheduler Interrupt"
+string_17 db "-- Failed to create context"
+string_18 db "-- Failed to allocate space for PCBlist"
+string_19 db "## Failed to allocate space for"
 string_last EQU $
 
 ;------------------------------------------------------------------
@@ -52,10 +55,10 @@ string_last EQU $
 ;------------------------------------------------------------------
 
 ; Shortcut string access
-stringtable dd string_00, string_01, string_02, string_03, string_04, string_05, string_06, string_07, string_08, string_09, string_10, string_11, string_12, string_13, string_14, string_15, string_16
+stringtable dd string_00, string_01, string_02, string_03, string_04, string_05, string_06, string_07, string_08, string_09, string_10, string_11, string_12, string_13, string_14, string_15, string_16, string_17, string_18, string_19
 
 ; String lengths
-stringlength dd string_01-string_00, string_02-string_01, string_03-string_02, string_04-string_03, string_05-string_04, string_06-string_05, string_07-string_06, string_08-string_07, string_09-string_08, string_10-string_09, string_11-string_10, string_12-string_11, string_13-string_12, string_14-string_13, string_15-string_14, string_16-string_15, string_last-string_16
+stringlength dd string_01-string_00, string_02-string_01, string_03-string_02, string_04-string_03, string_05-string_04, string_06-string_05, string_07-string_06, string_08-string_07, string_09-string_08, string_10-string_09, string_11-string_10, string_12-string_11, string_13-string_12, string_14-string_13, string_15-string_14, string_16-string_15, string_17-string_16, string_18-string_17, string_19-string_18, string_last-string_19
 
 ;------------------------------------------------------------------
 ; D A T A   S T O R E
