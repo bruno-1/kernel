@@ -7,6 +7,51 @@
 ;-----------------------------------------------------------------
 
 ;==================================================================
+;==========  SCHEDULER INTERRUPT SERVICE ROUTINE (ISR)  ===========
+;==================================================================
+;
+; start for unprivileged scheduling
+;
+;    +-----------------+
+;    |        SS       |  +72
+;    +-----------------+
+;    |       ESP       |  +68
+;    +-----------------+
+;
+; start for privileged scheduling
+;
+;    +-----------------+
+;    |      EFLAGS     |  +64
+;    +-----------------+
+;    |        CS       |  +60
+;    +-----------------+
+;    |       EIP       |  +56
+;    +-----------------+
+;
+;                 Byte 0
+;                      V
+;    +-----------------+
+;    |    Error Code   |  +52
+;    +-----------------+
+;    |      INT ID     |  +48
+;    +-----------------+
+;    |   General Regs  |
+;    | EAX ECX EDX EBX |  +32
+;    | ESP EBP ESI EDI |  +16
+;    +-----------------+
+;    |  Segment  Regs  |
+;    |   DS ES FS GS   |  <-- ebp
+;    +=================+
+;
+; eax=24  sched_yield
+; eax=59  exec (ebx=startAddressOfNewTask)
+; eax=60  exit
+; eax=62  kill (ebx=PIDtoKill)
+; eax=324 sched_start
+;
+;-----------------------------------------------------------------
+
+;==================================================================
 ; C O N S T A N T S
 ;==================================================================
 
@@ -20,8 +65,10 @@ MAX_PCBS EQU 8
 ; PCB List
 ;------------------------------------------------------------------
 STRUC PCB_list
+.used:		RESD 1
 .PCB_ptr:	RESD 1
 .next:		RESD 1
+.last:		RESD 1
 .size:
 ENDSTRUC
 
@@ -35,8 +82,9 @@ SECTION .data
 ; L I S T S
 ;------------------------------------------------------------------
 
-PCB_ptrs TIMES (MAX_PCBS*PCB_list.size) db 0
-next_PCB dd PCB_ptrs
+PCB_ptrs dd 1, 0, PCB_ptrs, PCB_ptrs
+	TIMES ((MAX_PCBS-1)*PCB_list.size) db 0
+next_PCB dd PCB_ptrs+PCB_list.size
 active_PCB dd 0
 
 ;==================================================================
@@ -62,68 +110,59 @@ BITS 32
 
 ;------------------------------------------------------------------
 ; INPUT
-;   ebp+8    Function address for new task
+;   ebx      Function address for new task
 ; RETURN
 ;   eax      PID
 ; REMARKS
-;   Rewrite as INT 0x80 function later
+;   Implement dynamic search for free space in list (& dynamic list size?)
 ;------------------------------------------------------------------
 GLOBAL scheduler_newTask
 scheduler_newTask:
-	; Stackframe setup
-	ENTER 0, 0
-	
-	; Create new context
-	MOV eax, DWORD [ebp+8]
-	PUSH eax
+	; Create new context ebx is passed thru
 	CALL context_new
-	Add esp, 4
 
-	; Store context
-	PUSH ebx
+	; Store context & advance next_PCB ptr -> unchecked if there still is free storage
 	MOV ebx, DWORD [next_PCB]
+	MOV DWORD [ebx+PCB_list.used], 1
 	MOV DWORD [ebx+PCB_list.PCB_ptr], eax
 	LEA eax, [ebx+PCB_list.size]
-	MOV DWORD [ebx+PCB_list.next], eax
-	MOV DWORD [next_PCB], eax
+	MOV DWORD [next_PCB], eax ; always uses next, free unused in between is skipped
+
+	; Close ring again
+	MOV eax, DWORD [PCB_ptrs+PCB_list.last]
+	MOV DWORD [eax+PCB_list.next], ebx
+	MOV DWORD [PCB_ptrs+PCB_list.last], ebx
+	MOV DWORD [ebx+PCB_list.next], PCB_ptrs
+	MOV DWORD [ebx+PCB_list.last], eax
 
 	; Return PID
 	MOV eax, DWORD [ebx+PCB_list.PCB_ptr]
 	MOV eax, DWORD [eax+PCB.PID]
-	POP ebx
 
 	; Cleanup
-	LEAVE
 	SYSLOG 1
 	RET
 
 ;------------------------------------------------------------------
 ; INPUT
-;   ebp+8    PID to kill
+;   ebx      PID to kill
 ; RETURN
 ;   eax      0 on success
 ; REMARKS
-;   Rewrite as INT 0x80 function later (check that only children can be killed)
+;   (check that only children can be killed)
 ;------------------------------------------------------------------
 GLOBAL scheduler_killTask
 ;===================================================================================================== UNTESTED
 scheduler_killTask:
-	; Stackframe setup
-	ENTER 0, 0
-	PUSH ecx
-	PUSH edx
-	PUSH ebx
-
 	; Search PCB for PID
-	MOV eax, DWORD [ebp+8]
-	MOV ebx, PCB_ptrs
-	MOV ecx, ebx
+	MOV eax, PCB_ptrs
+	MOV ecx, eax
 .next:
-	MOV edx, DWORD [ebx+PCB_list.PCB_ptr]
-	CMP eax, DWORD [edx+PCB.PID]
+	MOV edx, DWORD [eax+PCB_list.PCB_ptr]
+	CMP ebx, DWORD [edx+PCB.PID]
 	JE .found
-	MOV ebx, DWORD [ebx+PCB_list.next]
-	CMP ebx, ecx
+	MOV eax, DWORD [eax+PCB_list.next]
+	CMP eax, ecx
 	JNE .next
 
 	; One runthru done = fail
@@ -133,51 +172,55 @@ scheduler_killTask:
 
 	; Kill found task
 .found:
+	MOV ebx, edx
+	MOV ecx, eax
+	PUSH ecx
 	PUSH edx
 	CALL context_del
-	ADD esp, 4
-	SYSLOG 3
-
-	; Cleanup
-.cleanup:
-	POP ebx
 	POP edx
 	POP ecx
-	LEAVE
+	TEST eax, eax
+	JNZ .cleanup
+
+	; Erase task from queue
+	MOV DWORD [ecx+PCB_list.used], 0
+	MOV edx, DWORD [ecx+PCB_list.next]
+	MOV ecx, DWORD [ecx+PCB_list.last]
+	MOV DWORD [ecx+PCB_list.next], edx
+	MOV DWORD [edx+PCB_list.last], ecx
+	
+	; Cleanup
+.cleanup:
 	RET
 
 ;------------------------------------------------------------------
 ; INPUT
 ;   none
 ; RETURN
-;   does not return
-; REMARKS
-;   Rewrite as INT 0x80 function exit() later
+;   via context_set
 ;------------------------------------------------------------------
 GLOBAL scheduler_exit
 ;===================================================================================================== UNTESTED
 scheduler_exit:
-	; Get current PID ans set status to not running
+	; Get current PID and set status to not running
 	MOV ebx, DWORD [active_PCB]
+	MOV edx, DWORD [ebx+PCB_list.next]
+	PUSH edx
 	MOV ebx, DWORD [ebx+PCB_list.PCB_ptr]
-	MOV eax, DWORD [ebx+PCB.PID]
-	MOV DWORD [ebx+PCB.status], 0
+	MOV DWORD [ebx+PCB.status], 0 ; Set status not running so kill works
+	MOV ebx, DWORD [ebx+PCB.PID]
 
 	; Call kill procedure, afterwards old stack is still used...
-	PUSH eax
 	CALL scheduler_killTask
-	ADD esp, 4
+	POP edx
 
 	; Check if it worked
 	TEST eax, eax
 	JNZ .error
 
 	; Set next task
-	MOV ebx, DWORD [active_PCB]
-	MOV eax, DWORD [ebx+PCB_list.next]
-	MOV DWORD [active_PCB], eax
-	MOV eax, DWORD [eax+PCB_list.PCB_ptr]
-	ADD esp, 4
+	MOV DWORD [active_PCB], edx
+	MOV eax, DWORD [edx+PCB_list.PCB_ptr]
 	SYSLOG 4
 	JMP context_set
 
@@ -192,69 +235,47 @@ scheduler_exit:
 ; INPUT
 ;   none
 ; RETURN
-;   none
-; REMARKS
-;   Rewrite as INT 0x80 function later
+;   via context_switch
 ;------------------------------------------------------------------
 GLOBAL scheduler_yield
 scheduler_yield:
-	; Safe variables
-	PUSHFD
-	PUSH eax
-	PUSH ebx
-
-	; Search current and next PCB
+	; Search current and next PCB & update active
 	MOV ebx, DWORD [active_PCB]
-	MOV eax, DWORD [ebx+PCB_list.PCB_ptr]
-	MOV DWORD [context_current_PCB], eax
-	MOV ebx, DWORD [ebx+PCB_list.next]
-	MOV eax, DWORD [ebx+PCB_list.PCB_ptr]
-	MOV DWORD [context_new_PCB], eax
+	MOV eax, DWORD [ebx+PCB_list.next]
+	MOV DWORD [active_PCB], eax
+	MOV ebx, DWORD [ebx+PCB_list.PCB_ptr]
+	MOV eax, DWORD [eax+PCB_list.PCB_ptr]
 
-	; Set new PCB as active
-	MOV DWORD [active_PCB], ebx
-
-	; Restore values
-	POP ebx
-	POP eax
-	POPFD
-	
 	; Switch context
 	SYSLOG 6
-	CALL context_switch
-	SYSLOG 7
-	RET
+	JMP context_switch
 
 ;------------------------------------------------------------------
 ; INPUT
 ;   none
 ; RETURN
-;   does not return
-; REMARKS
-;   Initial setup for scheduler, starts first task
+;   via context_set
 ;------------------------------------------------------------------
 GLOBAL scheduler_start
 scheduler_start:
 	; Setup idle task
-	MOV eax, idle_task
-	PUSH eax
-	CALL scheduler_newTask
-	ADD esp, 4
-
-	; Setup list as ring
-	MOV ebx, DWORD [next_PCB]
-	LEA eax, [ebx-PCB_list.size]
-	MOV DWORD [eax+PCB_list.next], PCB_ptrs
+	MOV ebx, idle_task
+	CALL context_new
+	MOV DWORD [PCB_ptrs+PCB_list.PCB_ptr], eax
+	MOV DWORD [eax+PCB.PID], 0 ; Fake idle task ID to zero -> one arbitrary ID > 0 is never used
 
 	; Set first active
 	MOV DWORD [active_PCB], PCB_ptrs
 	MOV eax, DWORD [PCB_ptrs+PCB_list.PCB_ptr]
-	ADD esp, 4
 	SYSLOG 8
 	JMP context_set
 
+;------------------------------------------------------------------
+; Idle Task -> just yielding to next task
+;------------------------------------------------------------------
 idle_task:
 	SYSLOG 15
-	CALL scheduler_yield
+	MOV eax, 24
+	INT 0x80
 	JMP idle_task
 

@@ -5,6 +5,8 @@
 #==========  TRAP-HANDLER FOR SUPERVISOR CALLS INT 80h  ===========
 #==================================================================
         .section        .data
+ret_code:
+	.long 0
         .align  16
 svccnt: .space  N_SYSCALLS * 4, 0
 #-------------------------------------------------------------------
@@ -30,10 +32,25 @@ sys_call_table:
         .long   do_nothing   # 11
         .long   do_nothing   # 12
         .long   sys_time     # 13
-.rept	89
-        .long   do_nothing   # 14 to 102
+.rept	10
+        .long   do_nothing   # 14 to 23
+.endr
+	.long	Scheduler_common_stub # 24
+.rept	34
+        .long   do_nothing   # 25 to 58
+.endr
+	.long	Scheduler_common_stub # 59
+	.long	Scheduler_common_stub # 60
+        .long   do_nothing   # 61
+	.long	Scheduler_common_stub # 62
+.rept	40
+        .long   do_nothing   # 63 to 102
 .endr
         .long   sys_syslog   # 103
+.rept	220
+        .long   do_nothing   # 104 to 323
+.endr
+	.long	Scheduler_common_stub # 324
         .equ    N_SYSCALLS, (.-sys_call_table)/4
 #------------------------------------------------------------------
         .align   16
@@ -127,4 +144,158 @@ sys_time:       # time system call
 sys_syslog:       # for logging data to memory
         .extern syslog
         jmp     syslog
+
+#==================================================================
+#==========  SCHEDULER INTERRUPT SERVICE ROUTINE (ISR)  ===========
+#==================================================================
+#
+# start for unprivileged scheduling
+#
+#    +-----------------+
+#    |        SS       |  +72
+#    +-----------------+
+#    |       ESP       |  +68
+#    +-----------------+
+#
+# start for privileged scheduling
+#
+#    +-----------------+
+#    |      EFLAGS     |  +64
+#    +-----------------+
+#    |        CS       |  +60
+#    +-----------------+
+#    |       EIP       |  +56
+#    +-----------------+
+#
+#                 Byte 0
+#                      V
+#    +-----------------+
+#    |    Error Code   |  +52
+#    +-----------------+
+#    |      INT ID     |  +48
+#    +-----------------+
+#    |   General Regs  |
+#    | EAX ECX EDX EBX |  +32
+#    | ESP EBP ESI EDI |  +16
+#    +-----------------+
+#    |  Segment  Regs  |
+#    |   DS ES FS GS   |  <-- ebp
+#    +=================+
+#
+# eax=24  sched_yield
+# eax=59  exec (ebx=startAddressOfNewTask)
+# eax=60  exit
+# eax=62  kill (ebx=PIDtoKill)
+# eax=324 sched_start
+#
+#-----------------------------------------------------------------
+.extern scheduler_newTask
+.extern scheduler_killTask
+.extern scheduler_exit
+.extern scheduler_yield
+.extern scheduler_start
+
+        .align  8
+Scheduler_common_stub:
+
+	#----------------------------------------------------------
+	# Prepare stack data
+	#----------------------------------------------------------
+	
+	# Dummy Errorcode and interrupt id
+	pushl $0
+	pushl $0x80
+
+        # Save general registers
+        pushal
+        pushl %ds
+        pushl %es
+        pushl %fs
+        pushl %gs
+        mov %esp, %ebp
+	movl $0, ret_code(,1)
+
+        # Segment register setup
+	mov $privDS, %ax
+        mov %ax, %ds
+        mov %ax, %es
+        mov %ax, %gs
+        mov %ax, %fs
+
+	# disable interrupts
+	cli
+
+	#----------------------------------------------------------
+	# Call scheduler function
+	#----------------------------------------------------------
+
+	# Syslog Ausgabe
+	mov $16, %edx
+	mov $0x30387830, %edi # ASCII '0x80'
+	MOV $103,  %eax
+	int $0x80
+
+	# Select scheduler function
+	mov 44(%ebp), %eax
+	pushl %ebp
+	cmp $24, %eax
+	jne .next_sched_func0
+	call scheduler_yield
+	jmp .end_sched_func
+.next_sched_func0:
+	cmp $59, %eax
+	jne .next_sched_func1
+	incl ret_code(,1)
+	call scheduler_newTask
+	jmp .end_sched_func
+.next_sched_func1:
+	cmp $60, %eax
+	jne .next_sched_func2
+	call scheduler_exit
+	jmp .end_sched_func
+.next_sched_func2:
+	cmp $62, %eax
+	jne .next_sched_func3
+	incl ret_code(,1)
+	call scheduler_killTask
+	jmp .end_sched_func
+.next_sched_func3:
+	cmp $324, %eax
+	jne .next_sched_func4
+	call scheduler_start
+	jmp .end_sched_func
+.next_sched_func4:
+	# Error handling for unknown id -> do nothing
+.end_sched_func:
+	popl %ebp
+
+	# Check return code and save it
+	cmpl $0, ret_code(,1)
+	je .no_ret_code
+	mov %eax, 52(%ebp)
+.no_ret_code:
+
+	#----------------------------------------------------------
+	# Deconstruct stack data
+	#----------------------------------------------------------
+
+	# Restore registers
+	popl %gs
+        popl %fs
+        popl %es
+        popl %ds
+        popal
+
+	# Remove error code and interrupt id & modify eax to return code if neccessary
+	cmpl $0, ret_code(,1)
+	je .just_clear
+	mov 4(%esp), %eax
+.just_clear:
+	add $8, %esp
+
+	# enable interrupts
+	sti
+
+	# End interrupt and resume normal execution
+	iret
 

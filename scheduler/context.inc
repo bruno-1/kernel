@@ -10,7 +10,7 @@
 
 ;------------------------------------------------------------------
 ; INPUT
-;   ebp+8    Function address for new task
+;   ebx      Function address for new task
 ; RETURN
 ;   eax      Pointer to PCB
 ;------------------------------------------------------------------
@@ -18,22 +18,11 @@ EXTERN context_new
 
 ;------------------------------------------------------------------
 ; INPUT
-;   ebp+8    Pointer to PCB
+;   ebx      Pointer to PCB
 ; RETURN
 ;   eax      0 on success
 ;------------------------------------------------------------------
 EXTERN context_del
-
-;------------------------------------------------------------------
-; INPUT
-;   context_current_PCB	Pointer to new PCB
-;   context_new_PCB	Pointer to currently running PCB
-; RETURN
-;   none
-;------------------------------------------------------------------
-EXTERN context_switch
-EXTERN context_current_PCB
-EXTERN context_new_PCB
 
 ;==================================================================
 ; E X T E R N A L   J U M P S
@@ -42,8 +31,17 @@ EXTERN context_new_PCB
 ;------------------------------------------------------------------
 ; INPUT
 ;   eax      Pointer to new PCB
+;   ebx      Pointer to currently running PCB
 ; RETURN
-;   does not return
+;   none
+;------------------------------------------------------------------
+EXTERN context_switch
+
+;------------------------------------------------------------------
+; INPUT
+;   eax      Pointer to new PCB
+; RETURN
+;   none
 ;------------------------------------------------------------------
 EXTERN context_set
 

@@ -48,9 +48,6 @@ BITS 32
 ; Syslog
 %INCLUDE 'syslog.inc'
 
-; Scheduler
-%INCLUDE 'scheduler.inc'
-
 ; Converter "Syscall"
 EXTERN uint32_to_dec
 
@@ -90,7 +87,10 @@ EXTERN uint32_to_dec
 	JNE %%waste_time_loop1
 
 	; Yield for other tasks
-	CALL scheduler_yield
+	PUSH eax
+	MOV eax, 24
+	INT 0x80
+	POP eax
 
 	; Sanity check
 	CMP ecx, DELAY+%1
@@ -112,7 +112,8 @@ EXTERN uint32_to_dec
 	MOV ecx, error
 	MOV eax, 0x04
 	INT 0x80
-	CALL scheduler_exit
+	MOV eax, 60
+	INT 0x80
 
 %ENDMACRO
 
@@ -168,7 +169,10 @@ proggE:
 	JNZ .waste_time_loop1
 
 	; Yield for other tasks
-	CALL scheduler_yield
+	PUSH eax
+	MOV eax, 24
+	INT 0x80
+	POP eax
 
 	; Sanity check
 	TEST ecx, ecx
@@ -191,5 +195,6 @@ proggE:
 	MOV ecx, error
 	MOV eax, 0x04
 	INT 0x80
-	CALL scheduler_exit
+	MOV eax, 60
+	INT 0x80
 

@@ -45,9 +45,6 @@ BITS 32
 ; E X T E R N A L   F U N C T I O N S
 ;------------------------------------------------------------------
 
-; Scheduler
-%INCLUDE 'scheduler.inc'
-
 ; Converter "Syscall"
 EXTERN uint32_to_dec
 
@@ -67,29 +64,27 @@ main:
 	;----------------------------------------------------------
 	; Scheduler Tasks Setup
 	;----------------------------------------------------------
-	SUB esp, 4
-	MOV ebp, esp
-	MOV eax, proggA
-	MOV DWORD [ebp], eax
-	CALL scheduler_newTask
+	
+	MOV ebx, proggA
+	MOV eax, 59
+	INT 0x80
 	MOV DWORD [PIDa], eax
-	MOV eax, proggB
-	MOV DWORD [ebp], eax
-	CALL scheduler_newTask
+	MOV ebx, proggB
+	MOV eax, 59
+	INT 0x80
 	MOV DWORD [PIDb], eax
-	MOV eax, proggC
-	MOV DWORD [ebp], eax
-	CALL scheduler_newTask
+	MOV ebx, proggC
+	MOV eax, 59
+	INT 0x80
 	MOV DWORD [PIDc], eax
-	MOV eax, proggD
-	MOV DWORD [ebp], eax
-	CALL scheduler_newTask
+	MOV ebx, proggD
+	MOV eax, 59
+	INT 0x80
 	MOV DWORD [PIDd], eax
-	MOV eax, proggE
-	MOV DWORD [ebp], eax
-	CALL scheduler_newTask
+	MOV ebx, proggE
+	MOV eax, 59
+	INT 0x80
 	MOV DWORD [PIDe], eax
-	ADD esp, 4
 
 	;----------------------------------------------------------
 	; Print Process IDs
@@ -124,7 +119,8 @@ main:
 	;----------------------------------------------------------
 	; Start Scheduler
 	;----------------------------------------------------------
-	CALL scheduler_start
+	MOV eax, 324
+	INT 0x80
 
 	;----------------------------------------------------------
 	; Cleanup in case of error

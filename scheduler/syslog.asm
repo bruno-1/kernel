@@ -35,7 +35,7 @@ string_03 db "-- Killed task"
 string_04 db "-- Task exited"
 string_05 db "-- Failed to kill self"
 string_06 db "-- Task yielded"
-string_07 db "-- Task resumed"
+string_07 db "-- Task interrupted" ; currently unused
 string_08 db "-- Scheduler started"
 string_09 db "## Created new context"
 string_10 db "## Deleted context"
@@ -44,6 +44,7 @@ string_12 db "## Stored context"
 string_13 db "## Set context"
 string_14 db "// Userprogg"
 string_15 db "\\ Idle task executed"
+string_16 db "** Scheduler Interrupt"
 string_last EQU $
 
 ;------------------------------------------------------------------
@@ -51,10 +52,10 @@ string_last EQU $
 ;------------------------------------------------------------------
 
 ; Shortcut string access
-stringtable dd string_00, string_01, string_02, string_03, string_04, string_05, string_06, string_07, string_08, string_09, string_10, string_11, string_12, string_13, string_14, string_15
+stringtable dd string_00, string_01, string_02, string_03, string_04, string_05, string_06, string_07, string_08, string_09, string_10, string_11, string_12, string_13, string_14, string_15, string_16
 
 ; String lengths
-stringlength dd string_01-string_00, string_02-string_01, string_03-string_02, string_04-string_03, string_05-string_04, string_06-string_05, string_07-string_06, string_08-string_07, string_09-string_08, string_10-string_09, string_11-string_10, string_12-string_11, string_13-string_12, string_14-string_13, string_15-string_14, string_last-string_15
+stringlength dd string_01-string_00, string_02-string_01, string_03-string_02, string_04-string_03, string_05-string_04, string_06-string_05, string_07-string_06, string_08-string_07, string_09-string_08, string_10-string_09, string_11-string_10, string_12-string_11, string_13-string_12, string_14-string_13, string_15-string_14, string_16-string_15, string_last-string_16
 
 ;------------------------------------------------------------------
 ; D A T A   S T O R E

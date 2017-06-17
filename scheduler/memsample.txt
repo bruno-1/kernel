@@ -1,222 +1,200 @@
+** Scheduler Interrupt 0x80
 ## Created new context
 -- Created new task
+** Scheduler Interrupt 0x80
 ## Created new context
 -- Created new task
+** Scheduler Interrupt 0x80
 ## Created new context
 -- Created new task
+** Scheduler Interrupt 0x80
 ## Created new context
 -- Created new task
+** Scheduler Interrupt 0x80
 ## Created new context
 -- Created new task
+** Scheduler Interrupt 0x80
 ## Created new context
--- Created new task
 -- Scheduler started
 ## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
 // Userprogg A   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
 // Userprogg B   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
 // Userprogg C   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
 // Userprogg D   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
 // Userprogg E   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
 \\ Idle task executed
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg A   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg B   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg C   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg D   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg E   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 \\ Idle task executed
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg A   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg B   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg C   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg D   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg E   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 \\ Idle task executed
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg A   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg B   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg C   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg D   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg E   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 \\ Idle task executed
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg A   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg B   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg C   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg D   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
 // Userprogg E   
+** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
--- Task resumed
-\\ Idle task executed
--- Task yielded
-## Started context switch
-## Stored context
-## Set context
--- Task resumed
-// Userprogg A   
--- Task yielded
-## Started context switch
-## Stored context
-## Set context
--- Task resumed
-// Userprogg B   
--- Task yielded
-## Started context switch
-## Stored context
-## Set context
--- Task resumed
-// Userprogg C   
--- Task yielded
-## Started context switch
-## Stored context
-## Set context
--- Task resumed
-// Userprogg D   
--- Task yielded
-## Started context switch
-## Stored context
-## Set context
--- Task resumed
-// Userprogg E   
--- Task yielded
-## Started context switch
-## Stored context
-## Set context
--- Task resumed
-\\ Idle task executed
--- Task yielded
-## Starte
+\\ I
