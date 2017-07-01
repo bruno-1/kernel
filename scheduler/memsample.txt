@@ -47,7 +47,7 @@
 ## Started context switch
 ## Stored context
 ## Set context
-// Userprogg E   
+// Userprogg E 1 
 ** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
@@ -83,7 +83,25 @@
 ## Started context switch
 ## Stored context
 ## Set context
-// Userprogg E   
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
 ** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
@@ -119,7 +137,32 @@
 ## Started context switch
 ## Stored context
 ## Set context
-// Userprogg E   
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
 ** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
@@ -155,7 +198,32 @@
 ## Started context switch
 ## Stored context
 ## Set context
-// Userprogg E   
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
 ** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
@@ -191,10 +259,536 @@
 ## Started context switch
 ## Stored context
 ## Set context
-// Userprogg E   
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
 ** Scheduler Interrupt 0x80
 -- Task yielded
 ## Started context switch
 ## Stored context
 ## Set context
-\\ I
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg C   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg D   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 3 
+** Scheduler Interrupt 0x80
+## Deleted context
+** Scheduler Interrupt 0x80
+## Deleted context
+-- Task exited
+## Set context
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+** Scheduler Interrupt 0x80
+## Created new context
+-- Created new task
+// Userprogg E 2 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg E 1 
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg loop
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+\\ Idle task executed
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg A   
+** Scheduler Interrupt 0x80
+-- Task yielded
+## Started context switch
+## Stored context
+## Set context
+// Userprogg B   
+** Scheduler Inter

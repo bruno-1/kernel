@@ -108,9 +108,18 @@ context_new:
 .success_pcb:
 	POP edx
 
-	; Fill new PCB
+	; Check PID overflow
 	MOV ebx, DWORD [currPID]
+	CMP ebx, 0xFFFFFFFF
+	JNE .no_overflow
+	ADD esp, 4
+	XOR eax, eax
+	SYSLOG 19, 'PID '
+	RET
+.no_overflow:
 	INC DWORD [currPID]
+
+	; Fill new PCB
 	MOV DWORD [eax+PCB.PID], ebx
 	MOV DWORD [eax+PCB.status], 0
 	POP ebx
@@ -160,7 +169,6 @@ context_new:
 ;   eax      0 on success
 ;------------------------------------------------------------------
 GLOBAL context_del
-;===================================================================================================== UNTESTED
 context_del:
 	; Check running
 	MOV eax, DWORD [ebx+PCB.status]

@@ -169,8 +169,14 @@ scheduler_newTask:
 ;   (check that only children can be killed)
 ;------------------------------------------------------------------
 GLOBAL scheduler_killTask
-;===================================================================================================== UNTESTED
 scheduler_killTask:
+	; check PID -> disallow killing of PID 0 (idle task)
+	TEST ebx, ebx
+	JNZ .killOK
+	MOV eax, -1
+	RET
+.killOK:
+
 	; Search PCB for PID
 	MOV eax, PCB_ptrs
 	MOV ecx, eax
@@ -217,7 +223,6 @@ scheduler_killTask:
 ;   via context_set
 ;------------------------------------------------------------------
 GLOBAL scheduler_exit
-;===================================================================================================== UNTESTED
 scheduler_exit:
 	; Get current PID and set status to not running
 	MOV ebx, DWORD [active_PCB]
@@ -227,7 +232,7 @@ scheduler_exit:
 	MOV DWORD [ebx+PCB.status], 0 ; Set status not running so kill works
 	MOV ebx, DWORD [ebx+PCB.PID]
 
-	; Call kill procedure, afterwards old stack is still used...
+	; Call kill procedure, afterwards old stack is still used... -> dangerous but works due to special stack_malloc
 	CALL scheduler_killTask
 	POP edx
 

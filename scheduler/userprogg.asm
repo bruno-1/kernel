@@ -34,6 +34,20 @@ error db "Error in sanity check...", 13
 ; error string-length
 error_length EQU $-error
 
+; progg start string
+start_string db "Progg "
+s_proggname db "X", " PID: "
+s_ascii_dec db "         0"
+db 13
+; progg start string-length
+start_string_length EQU $-start_string
+
+; kill string
+killsuc_string db "Succeded killing endless task", 13
+killsuc_string_length EQU $-killsuc_string
+killfail_string db "Failed killing endless task", 13
+killfail_string_length EQU $-killfail_string
+
 ;==================================================================
 ; S E C T I O N   C O D E
 ;==================================================================
@@ -139,62 +153,89 @@ proggD:
 
 GLOBAL proggE
 proggE:
-	; Setup
-	MOV eax, -1
-.run_loop:
-
-	; Prepare text
-	PUSH eax
-	MOV edi, ascii_dec
-	MOV cx, 0x000A
-	CALL uint32_to_dec
-	MOV al, "E"
-	MOV BYTE [proggname], al
-
-	; Print text
-	MOV ebx, 1
-	MOV edx, string_length
-	MOV ecx, string
-	MOV eax, 0x04
-	INT 0x80
-	POP eax
-
-	; Syslog text
-	SYSLOG 14, 'E   '
-
-	; Waste time
-	MOV ecx, DELAY+5
-.waste_time_loop1:
-	DEC ecx
-	JNZ .waste_time_loop1
-
-	; Yield for other tasks
-	PUSH eax
+	; First yield to other tasks
+	SYSLOG 14, "E 1 "
 	MOV eax, 24
 	INT 0x80
-	POP eax
 
-	; Sanity check
-	TEST ecx, ecx
-	JNZ .end_progg
+	; Start two new tasks
+	MOV ebx, proggE
+	MOV eax, 59
+	INT 0x80
+	PUSH eax
+	MOV ebx, proggEndless
+	MOV eax, 59
+	INT 0x80
+	PUSH eax
 
-	; Waste more time
-.waste_time_loop2:
-	INC ecx
-	CMP ecx, DELAY+5
-	JNE .waste_time_loop2
-
-	; Next run
-	DEC eax
-	JMP .run_loop
-
-	; Programm beenden
-.end_progg:
+	; Print new PIDs
+	MOV BYTE [s_proggname], "E"
+	MOV eax, DWORD [esp+4]
+	MOV edi, s_ascii_dec
+	MOV cx, 0x000A
+	CALL uint32_to_dec
 	MOV ebx, 1
-	MOV edx, error_length
-	MOV ecx, error
+	MOV edx, start_string_length
+	MOV ecx, start_string
 	MOV eax, 0x04
 	INT 0x80
+	MOV BYTE [s_proggname], "L"
+	MOV eax, DWORD [esp]
+	MOV edi, s_ascii_dec
+	MOV cx, 0x000A
+	CALL uint32_to_dec
+	MOV ebx, 1
+	MOV edx, start_string_length
+	MOV ecx, start_string
+	MOV eax, 0x04
+	INT 0x80
+
+	; Yield to other tasks
+	SYSLOG 14, "E 2 "
+	MOV eax, 24
+	INT 0x80
+
+	; Kill endless task
+	SYSLOG 14, "E 3 "
+	POP ebx
+	MOV eax, 62
+	INT 0x80
+	TEST eax, eax
+	JNZ .kill_failed
+
+	; Print kill result
+	MOV edx, killsuc_string_length
+	MOV ecx, killsuc_string
+	JMP .kill_succeded
+.kill_failed:
+	MOV edx, killfail_string_length
+	MOV ecx, killfail_string
+.kill_succeded:
+	MOV ebx, 1
+	MOV eax, 0x04
+	INT 0x80
+
+	; End self
+	ADD esp, 4
 	MOV eax, 60
 	INT 0x80
+	CLI
+	HLT
+	JMP $
+
+proggEndless:
+	; Waste time
+	XOR ecx, ecx
+.waste_time_loop1:
+	INC ecx
+	CMP ecx, DELAY
+	JNE .waste_time_loop1
+
+	; Yield to other tasks
+	SYSLOG 14, "loop"
+	MOV eax, 24
+	INT 0x80
+
+	; Make it endless
+	JMP proggEndless
 
