@@ -122,6 +122,7 @@ context_new:
 	; Fill new PCB
 	MOV DWORD [eax+PCB.PID], ebx
 	MOV DWORD [eax+PCB.status], 0
+	MOV DWORD [eax+PCB.ticks], 0
 	POP ebx
 	MOV DWORD [eax+PCB.progg], ebx
 	MOV DWORD [eax+PCB.reg_eip], ebx

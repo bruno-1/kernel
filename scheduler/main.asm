@@ -7,13 +7,6 @@
 ;-----------------------------------------------------------------
 
 ;==================================================================
-; C O N S T A N T S
-;==================================================================
-
-MICROSECONDS EQU 10000
-PRESCALER EQU (1193182*MICROSECONDS/1000000)
-
-;==================================================================
 ; S E C T I O N   D A T A
 ;==================================================================
 
@@ -150,25 +143,16 @@ MOV DWORD [PIDe], -1 ; disable proggE
 	;----------------------------------------------------------
 
 	; Register IRQ handler
-	CLI
+	CLI ; disable interrupts until PIT is properly setup
 	PUSH timer_irq
 	PUSH 0x20
 	CALL register_isr
 	ADD esp, 8
 
-	; Configure PIT
-	MOV al, 0x34 ; 0b00110100 -> Timer0, Low&High Byte, rate generator
-	OUT 0x43, al
-	MOV ax, PRESCALER
-	OUT 0x40, al
-	SHR ax, 8
-	OUT 0x40, al
-
 	;----------------------------------------------------------
 	; Start Scheduler
 	;----------------------------------------------------------
 
-	STI ; redundant -> will be overwritten by context switch
 	MOV eax, 324
 	INT 0x80
 

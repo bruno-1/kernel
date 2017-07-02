@@ -56,6 +56,8 @@
 ;==================================================================
 
 MAX_PCBS EQU 128
+MICROSECONDS EQU 5000
+PRESCALER EQU (1193182*MICROSECONDS/1000000)
 
 ;==================================================================
 ; S T R U C T U R E S
@@ -102,6 +104,20 @@ BITS 32
 
 ; Context functions
 %INCLUDE 'context.inc'
+
+;------------------------------------------------------------------
+; M A C R O S
+;------------------------------------------------------------------
+
+; Display predefined text
+%MACRO RESET_PIT 0
+	MOV al, 0x30 ; 0b00110100 -> Timer0, Low&High Byte, interrupt mode
+	OUT 0x43, al
+	MOV ax, PRESCALER
+	OUT 0x40, al
+	SHR ax, 8
+	OUT 0x40, al
+%ENDMACRO
 
 ;------------------------------------------------------------------
 ; M A I N   F U N C T I O N S
@@ -261,6 +277,33 @@ scheduler_exit:
 ;------------------------------------------------------------------
 GLOBAL scheduler_yield
 scheduler_yield:
+	; Calculate execution time
+	PUSHFD
+	CLI
+	XOR eax, eax
+	MOV ebx, PRESCALER
+	MOV al, 0x00 ; Channel 0 read count in latch
+	OUT 0x43, al
+	IN al, 0x40
+	SHL ax, 8
+	IN al, 0x40
+	ROL ax, 8
+	CMP eax, PRESCALER
+	JBE .no_overflow
+	XOR eax, eax
+.no_overflow:
+	SUB ebx, eax
+	POPFD
+
+	; Store last execution time in PCB
+	MOV eax, DWORD [active_PCB]
+	MOV eax, DWORD [eax+PCB_list.PCB_ptr]
+	MOV DWORD [eax+PCB.ticks], ebx
+
+	; Reconfigure PIT -> resets counter on timer interrupt
+	; and on active yield so the next task handicapped
+	RESET_PIT
+
 	; Search current and next PCB & update active
 	MOV ebx, DWORD [active_PCB]
 	MOV eax, DWORD [ebx+PCB_list.next]
@@ -296,6 +339,9 @@ scheduler_start:
 	; idle task modification
 	MOV DWORD [PCB_ptrs+PCB_list.PCB_ptr], eax
 	MOV DWORD [eax+PCB.PID], 0 ; Fake idle task ID to zero -> one arbitrary ID > 0 is never used
+
+	; Configure PIT
+	RESET_PIT
 
 	; Set first active
 	MOV DWORD [active_PCB], PCB_ptrs

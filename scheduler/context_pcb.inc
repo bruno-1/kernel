@@ -9,6 +9,7 @@ STRUC PCB
 ; process status
 .PID:		RESD 1
 .status:	RESD 1
+.ticks:		RESD 1
 
 ; initial values
 .stack:		RESD 1
