@@ -9,8 +9,6 @@
 ; C O N S T A N T S
 ;==================================================================
 
-STACK_CORRECTION EQU 20    ; stack ptr correction to remove interrupt handler data and address registers
-TEMP_STORE_MAX_LONGS EQU 8 ; Number of 4bytes to store temp data
 STACKBUFFER_SIZE EQU 0x3FC ; size of stack per task
 
 ; Memory addrs for stack and pcb storage
@@ -55,9 +53,6 @@ context_current_PCB: dd 0
 GLOBAL context_new_PCB
 context_new_PCB: dd 0
 
-; temporary storage
-temp_store: TIMES (TEMP_STORE_MAX_LONGS+1) dd 0
-
 ;==================================================================
 ; S E C T I O N   C O D E
 ;==================================================================
@@ -73,8 +68,8 @@ BITS 32
 %INCLUDE 'src/syslog.inc'
 
 ; GDT entries
-EXTERN privCS
-EXTERN privDS
+EXTERN userCS
+EXTERN userDS
 
 ;------------------------------------------------------------------
 ; M A I N   F U N C T I O N S
@@ -126,7 +121,7 @@ context_new:
 	POP ebx
 	MOV DWORD [eax+PCB.progg], ebx
 	MOV DWORD [eax+PCB.reg_eip], ebx
-	MOV DWORD [eax+PCB.reg_cs], privCS
+	MOV DWORD [eax+PCB.reg_cs], userCS
 
 	; Flags -> don't know -> copy flags of interrupted program
 	MOV ebx, DWORD [ebp+64]
@@ -149,14 +144,11 @@ context_new:
 	MOV DWORD [eax+PCB.reg_edi], ebx
 
 	; Segment registers
-	MOV bx, privDS
+	MOV bx, userDS
 	MOV DWORD [eax+PCB.reg_ds], ebx
 	MOV DWORD [eax+PCB.reg_ss], ebx
-	MOV bx, es
 	MOV DWORD [eax+PCB.reg_es], ebx
-	MOV bx, fs
 	MOV DWORD [eax+PCB.reg_fs], ebx
-	MOV bx, gs
 	MOV DWORD [eax+PCB.reg_gs], ebx
 
 	; Cleanup
@@ -224,8 +216,7 @@ context_switch:
 	MOV DWORD [ebx+PCB.reg_edx], edx
 	MOV edx, DWORD [ebp+32]
 	MOV DWORD [ebx+PCB.reg_ebx], edx
-	MOV edx, DWORD [ebp+28]
-	ADD edx, STACK_CORRECTION ; stack ptr correction to remove interrupt handler data and address registers
+	MOV edx, DWORD [ebp+68]
 	MOV DWORD [ebx+PCB.reg_esp], edx
 	MOV edx, DWORD [ebp+24]
 	MOV DWORD [ebx+PCB.reg_ebp], edx
@@ -235,8 +226,7 @@ context_switch:
 	MOV DWORD [ebx+PCB.reg_edi], edx
 
 	; Segment registers
-	XOR edx, edx
-	MOV dx, ss
+	MOV edx, DWORD [ebp+72]
 	MOV DWORD [ebx+PCB.reg_ss], edx
 	MOV edx, DWORD [ebp+12]
 	MOV DWORD [ebx+PCB.reg_ds], edx
@@ -270,54 +260,9 @@ context_set:
 	; Read from PCB
 	MOV DWORD [eax+PCB.status], 1
 
-	; Currently we are still on the old stack
-	; Copy everything from esp->ebp to temporary location
-	MOV ebx, ebp
-	SUB ebx, esp
-	CMP ebx, 4*(TEMP_STORE_MAX_LONGS+1)
-	JA .critical_too_long
-	MOV DWORD [temp_store], ebx
-	XOR ecx, ecx
-.firstcopy_compare:
-	LEA ebx, [esp+ecx]
-	CMP ebx, ebp
-	JE .firstcopy_finished
-	MOV dl, BYTE [ss:ebx]
-	MOV BYTE [ds:(temp_store+4+ecx)], dl
-	INC ecx
-	JMP .firstcopy_compare
-.critical_too_long:
-	; Error, data between esp and ebp is too long for storage
-	CLI
-	HLT
-	JMP .critical_too_long
-.firstcopy_finished:
-
-	; Switch to new stack
-	MOV ebx, DWORD [eax+PCB.reg_ss]
-	MOV ss, bx
-	MOV esp, DWORD [eax+PCB.reg_esp]
-
-	; Reserve space for registers
-	SUB esp, 68 ; interrupt stackframe
-	MOV ebp, esp ; restore base pointer
-
-	; Copy everything from temporary location to new stack
-	MOV ebx, DWORD [temp_store]
-	SUB esp, ebx
-	XOR ecx, ecx
-.secondcopy_compare:
-	LEA ebx, [esp+ecx]
-	CMP ebx, ebp
-	JE .secondcopy_finished
-	MOV dl, BYTE [ds:(temp_store+4+ecx)]
-	MOV BYTE [ss:ebx], dl
-	INC ecx
-	JMP .secondcopy_compare
-.secondcopy_finished:
-	; New stack completed
-
 	; Segment registers
+	MOV ebx, DWORD[eax+PCB.reg_ss]
+	MOV DWORD [ebp+72], ebx
 	MOV ebx, DWORD[eax+PCB.reg_ds]
 	MOV DWORD [ebp+12], ebx
 	MOV ebx, DWORD[eax+PCB.reg_es]
@@ -337,8 +282,7 @@ context_set:
 	MOV ebx, DWORD[eax+PCB.reg_ebx]
 	MOV DWORD [ebp+32], ebx
 	MOV ebx, DWORD[eax+PCB.reg_esp]
-	SUB ebx, STACK_CORRECTION ; stack ptr correction to add interrupt handler data and address registers
-	MOV DWORD [ebp+28], ebx
+	MOV DWORD [ebp+68], ebx
 	MOV ebx, DWORD[eax+PCB.reg_ebp]
 	MOV DWORD [ebp+24], ebx
 	MOV ebx, DWORD[eax+PCB.reg_esi]
@@ -353,11 +297,6 @@ context_set:
 	MOV DWORD [ebp+60], ebx
 	MOV ebx, DWORD[eax+PCB.reg_eflags]
 	MOV DWORD [ebp+64], ebx
-
-	; Dummy values for interrupt ID and error code
-	XOR eax, eax
-	MOV DWORD [ebp+48], eax
-	MOV DWORD [ebp+52], eax
 
 	; Return to switched in context
 	SYSLOG 13

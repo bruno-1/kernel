@@ -193,6 +193,7 @@ scheduler_killTask:
 	RET
 
 ;------------------------------------------------------------------
+; (ONLY FROM USER MODE thru INT)
 ; INPUT
 ;   none
 ; RETURN
@@ -207,7 +208,7 @@ scheduler_exit:
 	CALL sched_next
 	ADD esp, 4
 
-	; Call kill procedure, afterwards old stack is still used... -> dangerous but works due to special stack_malloc
+	; Call kill procedure
 	POP ebx
 	PUSH eax
 	CALL scheduler_killTask
@@ -232,6 +233,7 @@ scheduler_exit:
 	JMP .error
 
 ;------------------------------------------------------------------
+; (ONLY FROM USER MODE thru INT)
 ; INPUT
 ;   none
 ; RETURN

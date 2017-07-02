@@ -182,9 +182,9 @@ sys_syslog:       # for logging data to memory
 #    |   DS ES FS GS   |  <-- ebp
 #    +=================+
 #
-# eax=24  sched_yield
+# eax=24  sched_yield (ONLY FROM USER MODE)
 # eax=59  exec (ebx=startAddressOfNewTask)
-# eax=60  exit
+# eax=60  exit (ONLY FROM USER MODE)
 # eax=62  kill (ebx=PIDtoKill)
 # eax=324 sched_start
 #

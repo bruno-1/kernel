@@ -63,6 +63,9 @@ EXTERN remap_isr_pm
 EXTERN register_isr
 EXTERN scheduler_yield
 
+; Task-Switching
+EXTERN selTSS
+
 ; Interrupt handler-mapping
 timer_irq:
 	SYSLOG 16, "PIT "
@@ -150,9 +153,12 @@ MOV DWORD [PIDe], eax
 	ADD esp, 8
 
 	;----------------------------------------------------------
-	; Start Scheduler
+	; Setup TSS and start Scheduler
 	;----------------------------------------------------------
 
+	MOV ax, selTSS
+	LTR ax
+	SUB esp, 8 ; Dummy bytes (simulate call from userspace)
 	MOV eax, 324
 	INT 0x80
 

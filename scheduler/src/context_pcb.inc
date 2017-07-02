@@ -5,6 +5,7 @@
 ;------------------------------------------------------------------
 ; Process Control Block
 ;------------------------------------------------------------------
+
 STRUC PCB
 ; process status
 .PID:		RESD 1
@@ -37,4 +38,21 @@ STRUC PCB
 ; Struct size
 .size:
 ENDSTRUC
+
+;------------------------------------------------------------------
+; Unsaved registers
+;------------------------------------------------------------------
+;
+; CR3 -> virtual addressing
+;	-> unused in these examples
+; DR0-DR3 & DR6-DR7 -> Debug registers
+;	-> unused in this kernel
+; LDTR -> Local descriptor table
+;	-> descriptors are obsolete
+; ST0-ST7 -> FPU registers
+;	-> unused in these examples
+; MMX, SSE, AVX, etc.
+;	-> beyond the scope of these examples
+;
+;------------------------------------------------------------------
 
