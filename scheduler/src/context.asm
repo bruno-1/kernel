@@ -23,7 +23,7 @@ STACKBUFFER_MAX EQU 0x800000
 ; S T R U C T U R E S
 ;==================================================================
 
-%INCLUDE 'context_pcb.inc'
+%INCLUDE 'src/context_pcb.inc'
 
 ;==================================================================
 ; S E C T I O N   D A T A
@@ -70,7 +70,7 @@ BITS 32
 ;------------------------------------------------------------------
 
 ; Syslog
-%INCLUDE 'syslog.inc'
+%INCLUDE 'src/syslog.inc'
 
 ; GDT entries
 EXTERN privCS

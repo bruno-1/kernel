@@ -60,7 +60,7 @@ BITS 32
 ;------------------------------------------------------------------
 
 ; Syslog
-%INCLUDE 'syslog.inc'
+%INCLUDE 'src/syslog.inc'
 
 ; Converter "Syscall"
 EXTERN uint32_to_dec
@@ -233,5 +233,7 @@ proggEndless:
 
 	; Make it endless
 	SYSLOG 14, "loop"
+;	MOV eax, 24
+;	INT 0x80
 	JMP proggEndless
 

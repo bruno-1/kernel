@@ -2,7 +2,7 @@
 ; E X T E R N A L   S T R U C T U R E S
 ;==================================================================
 
-%INCLUDE 'context_pcb.inc'
+%INCLUDE 'src/context_pcb.inc'
 
 ;==================================================================
 ; E X T E R N A L   F U N C T I O N S

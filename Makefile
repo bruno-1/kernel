@@ -8,6 +8,7 @@ SUBDIRS     = boot dasboot
 SUBDIRS    += libkernel libminic
 SUBDIRS    += pmhello pgftdemo
 SUBDIRS    += demoapps tools elfexec
+SUBDIRS    += scheduler
 
 .PHONY: all subdirs $(SUBDIRS)
 .SECONDARY:

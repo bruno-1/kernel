@@ -49,7 +49,7 @@ BITS 32
 EXTERN uint32_to_dec
 
 ; Syslog
-%INCLUDE 'syslog.inc'
+%INCLUDE 'src/syslog.inc'
 
 ; Userprograms
 EXTERN proggA
@@ -102,11 +102,11 @@ main:
 	MOV eax, 59
 	INT 0x80
 	MOV DWORD [PIDd], eax
-;	MOV ebx, proggE
-;	MOV eax, 59
-;	INT 0x80
-;	MOV DWORD [PIDe], eax
-MOV DWORD [PIDe], -1 ; disable proggE
+MOV ebx, proggE
+MOV eax, 59
+INT 0x80
+MOV DWORD [PIDe], eax
+;MOV DWORD [PIDe], -1 ; disable proggE
 
 	;----------------------------------------------------------
 	; Print Process IDs
