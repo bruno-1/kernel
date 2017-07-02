@@ -7,6 +7,13 @@
 ;-----------------------------------------------------------------
 
 ;==================================================================
+; C O N S T A N T S
+;==================================================================
+
+MICROSECONDS EQU 10000
+PRESCALER EQU (1193182*MICROSECONDS/1000000)
+
+;==================================================================
 ; S E C T I O N   D A T A
 ;==================================================================
 
@@ -48,6 +55,9 @@ BITS 32
 ; Converter "Syscall"
 EXTERN uint32_to_dec
 
+; Syslog
+%INCLUDE 'syslog.inc'
+
 ; Userprograms
 EXTERN proggA
 EXTERN proggB
@@ -55,12 +65,30 @@ EXTERN proggC
 EXTERN proggD
 EXTERN proggE
 
+; IRQ
+EXTERN remap_isr_pm
+EXTERN register_isr
+EXTERN scheduler_yield
+
+; Interrupt handler-mapping
+timer_irq:
+	SYSLOG 16, "PIT "
+	JMP scheduler_yield
+	
+
 ;------------------------------------------------------------------
 ; M A I N   F U N C T I O N
 ;------------------------------------------------------------------
 
 GLOBAL main
 main:
+	;----------------------------------------------------------
+	; Setup APIC
+	;----------------------------------------------------------
+
+	CALL remap_isr_pm
+	STI ; enable here because flags are copied on task creation
+
 	;----------------------------------------------------------
 	; Scheduler Tasks Setup
 	;----------------------------------------------------------
@@ -81,10 +109,11 @@ main:
 	MOV eax, 59
 	INT 0x80
 	MOV DWORD [PIDd], eax
-	MOV ebx, proggE
-	MOV eax, 59
-	INT 0x80
-	MOV DWORD [PIDe], eax
+;	MOV ebx, proggE
+;	MOV eax, 59
+;	INT 0x80
+;	MOV DWORD [PIDe], eax
+MOV DWORD [PIDe], -1 ; disable proggE
 
 	;----------------------------------------------------------
 	; Print Process IDs
@@ -117,13 +146,35 @@ main:
 	JLE .print_next
 
 	;----------------------------------------------------------
+	; Setup Timer Interrupt
+	;----------------------------------------------------------
+
+	; Register IRQ handler
+	CLI
+	PUSH timer_irq
+	PUSH 0x20
+	CALL register_isr
+	ADD esp, 8
+
+	; Configure PIT
+	MOV al, 0x34 ; 0b00110100 -> Timer0, Low&High Byte, rate generator
+	OUT 0x43, al
+	MOV ax, PRESCALER
+	OUT 0x40, al
+	SHR ax, 8
+	OUT 0x40, al
+
+	;----------------------------------------------------------
 	; Start Scheduler
 	;----------------------------------------------------------
+
+	STI ; redundant -> will be overwritten by context switch
 	MOV eax, 324
 	INT 0x80
 
 	;----------------------------------------------------------
 	; Cleanup in case of error
 	;----------------------------------------------------------
+
 	RET
 

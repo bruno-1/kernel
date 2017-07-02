@@ -100,11 +100,11 @@ EXTERN uint32_to_dec
 	CMP ecx, DELAY+%1
 	JNE %%waste_time_loop1
 
-	; Yield for other tasks
-	PUSH eax
-	MOV eax, 24
-	INT 0x80
-	POP eax
+	; Yield for other tasks -> Timer takes care of that
+;	PUSH eax
+;	MOV eax, 24
+;	INT 0x80
+;	POP eax
 
 	; Sanity check
 	CMP ecx, DELAY+%1
@@ -231,11 +231,7 @@ proggEndless:
 	CMP ecx, DELAY
 	JNE .waste_time_loop1
 
-	; Yield to other tasks
-	SYSLOG 14, "loop"
-	MOV eax, 24
-	INT 0x80
-
 	; Make it endless
+	SYSLOG 14, "loop"
 	JMP proggEndless
 

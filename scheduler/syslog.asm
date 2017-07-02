@@ -15,6 +15,7 @@
 ;==================================================================
 
 STARTPOS EQU 0x800000 ; at 8 MiB (+ 128 KiB data segment offset) -> 0x820000
+ENDPOS EQU 0xFFFFFF ; till 16 MiB
 NEWLINE EQU 10
 
 ;==================================================================
@@ -113,6 +114,8 @@ syslog:
 	JMP .lock_ptr_start
 .lock_ptr_finish:
 	MOV edx, DWORD [curr_ptr]
+	CMP edx, ENDPOS
+	JA .end_int
 	ADD DWORD [curr_ptr], ecx
 	MOV DWORD [lock_ptr], 0
 
