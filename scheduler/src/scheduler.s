@@ -30,17 +30,23 @@ progname:
 theGDT:
         .include "comgdt.inc"
         #----------------------------------------------------------
+        # Code/Data, 32 bit, 4kB, Priv 0, Type 0x00, 'Read-Only'
+        # Base Address: 0x00100000   Limit: 0x000000ff
+        .equ    sel_extmem, (.-theGDT)+0 # selector for file-image
+        .globl  sel_extmem
+        .quad   0x00C09010000000FF      # file segment-descriptor
+        #----------------------------------------------------------
         # Code/Data, 32 bit, 4kB, Priv 3, Type 0x0a, 'Execute/Read'
-        # Base Address: 0x00010000   Limit: 0x0000ffff
+        # Base Address: 0x00000000   Limit: 0x0001ffff
         .equ    userCS, (.-theGDT)+3    # selector for ring3 code
         .globl  userCS
-        .quad   0x0040FA010000FFFF      # code segment-descriptor
+        .quad   0x00C1FA000000FFFF      # code segment-descriptor
         #----------------------------------------------------------
         # Code/Data, 32 bit, 4kB, Priv 3, Type 0x02, 'Read/Write'
-        # Base Address: 0x00020000   Limit: 0x0000ffff
+        # Base Address: 0x00000000   Limit: 0x0001ffff
         .equ    userDS, (.-theGDT)+3    # selector for ring3 data
         .globl  userDS
-        .quad   0x00C0F2020000FFFF      # data segment-descriptor
+        .quad   0x00C1F2000000FFFF      # data segment-descriptor
         #----------------------------------------------------------
         .equ    selTSS, (.-theGDT)+0    # selector for Task-State
 	.global selTSS

@@ -77,6 +77,13 @@ SECTION .text
 BITS 32
 
 ;------------------------------------------------------------------
+; E X T E R N A L   F U N C T I O N S
+;------------------------------------------------------------------
+
+; Task-Switching
+EXTERN privDS
+
+;------------------------------------------------------------------
 ; P U B L I C   F U N C T I O N S
 ;------------------------------------------------------------------
 
@@ -86,13 +93,18 @@ syslog:
 	PUSH ecx
 	PUSH ebx
 
+	; Save segment registers (might come here form userland)
+	PUSH ds
+	MOV cx, privDS
+	MOV ds, cx
+
 	; Sanity check message parameter
 	CMP edx, ((stringlength-stringtable)/4)-1
 	JA .end_int ; edx greater than highest message id
 
 	; Load string and length
-	MOV eax, DWORD [stringtable+4*edx]
-	MOV ecx, DWORD [stringlength+4*edx]
+	MOV eax, DWORD [ds:stringtable+4*edx]
+	MOV ecx, DWORD [ds:stringlength+4*edx]
 	TEST ecx, ecx
 	JZ .end_int ; string length is zero
 	INC ecx ; newline
@@ -105,33 +117,33 @@ syslog:
 
 	; Reserve memory for logging (synchronized)
 .lock_ptr_start:
-	LOCK BTS DWORD [lock_ptr], 0
+	LOCK BTS DWORD [ds:lock_ptr], 0
 	JNC .lock_ptr_finish
 .lock_ptr_loop:
 	PAUSE
-	TEST DWORD [lock_ptr], 1
+	TEST DWORD [ds:lock_ptr], 1
 	JNZ .lock_ptr_loop
 	JMP .lock_ptr_start
 .lock_ptr_finish:
-	MOV edx, DWORD [curr_ptr]
+	MOV edx, DWORD [ds:curr_ptr]
 	CMP edx, ENDPOS
 	JA .end_int
-	ADD DWORD [curr_ptr], ecx
-	MOV DWORD [lock_ptr], 0
+	ADD DWORD [ds:curr_ptr], ecx
+	MOV DWORD [ds:lock_ptr], 0
 
 	; Process parameter
-	MOV BYTE [edx+ecx-1], NEWLINE
+	MOV BYTE [ds:edx+ecx-1], NEWLINE
 	DEC ecx
 	TEST edi, edi
 	JZ .next_char
 	SUB ecx, 5
-	MOV BYTE [edx+ecx], ' '
-	MOV DWORD [edx+ecx+1], edi
+	MOV BYTE [ds:edx+ecx], ' '
+	MOV DWORD [ds:edx+ecx+1], edi
 
 	; Actual logging
 .next_char:
-	MOV bl, BYTE [eax]
-	MOV BYTE [edx], bl
+	MOV bl, BYTE [ds:eax]
+	MOV BYTE [ds:edx], bl
 	INC eax
 	INC edx
 	DEC ecx
@@ -139,6 +151,7 @@ syslog:
 
 	; End Interrupt
 .end_int:
+	POP ds
 	POP ebx
 	POP ecx
 	IRET

@@ -57,6 +57,9 @@ unsigned long setup_idle(void* PCB)
 		PCBlist[0].last = &PCBlist[0];
 	}
 
+	// Fake idle task ID to zero -> one arbitrary ID > 0 is never used
+	(*(PCB_t*)PCB).PID = 0;
+
 	// Store idle task at first position
 	PCBlist[0].PCB = PCB;
 	return (*(PCB_t*)PCB).PID;

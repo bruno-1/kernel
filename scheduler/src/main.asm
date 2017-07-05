@@ -7,6 +7,30 @@
 ;-----------------------------------------------------------------
 
 ;==================================================================
+; C O N S T A N T S
+;==================================================================
+
+;------------------------------------------------------------------
+; equates for Elf32 file-format (derived from 'elf.h')
+;------------------------------------------------------------------
+ELF_SIG		EQU 0x464C457F  ; ELF-file's 'signature'
+ELF_32		EQU	   1    ; Elf_32 file format
+ET_EXEC		EQU	   2    ; Executable file type
+e_ident		EQU	0x00    ; offset to ELF signature
+e_class		EQU	0x04    ; offset to file class
+e_type		EQU	0x10    ; offset to (TYPE,MACHINE)
+e_entry		EQU	0x18    ; offset to entry address
+e_phoff		EQU	0x1C    ; offset to PHT file-offset
+e_phentsize	EQU	0x2A    ; offset to PHT entry size
+e_phnum		EQU	0x2C    ; offset to PHT entry count
+PT_LOAD		EQU	   1    ; Loadable program segment
+p_type		EQU	0x00    ; offset to segment type
+p_offset	EQU	0x04    ; offset to seg file-offset
+p_paddr		EQU	0x0C    ; offset to seg phys addr
+p_filesz	EQU	0x10    ; offset to seg size in file
+p_memsz		EQU	0x14    ; offset to seg size in mem
+
+;==================================================================
 ; S E C T I O N   D A T A
 ;==================================================================
 
@@ -16,11 +40,7 @@ SECTION .data
 ; PIDs
 ;------------------------------------------------------------------
 
-PIDa dd 0
-PIDb dd 0
-PIDc dd 0
-PIDd dd 0
-PIDe dd 0
+PID dd 0
 
 ;------------------------------------------------------------------
 ; S T R I N G S
@@ -33,6 +53,10 @@ ascii_dec db "         0"
 db 13
 ; user string-length
 string_length EQU $-string
+
+; ELF Errors
+elferrmsg db "Unable to load ELF-image...", 13
+elferrmsglen EQU $-elferrmsg
 
 ;==================================================================
 ; S E C T I O N   C O D E
@@ -69,13 +93,19 @@ EXTERN scheduler_yield
 
 ; Task-Switching
 EXTERN selTSS
+EXTERN sel_extmem
+EXTERN userDS
+EXTERN privDS
 
-; Interrupt handler-mapping
+;------------------------------------------------------------------
+; T I M E R   I N T E R R U P T
+;------------------------------------------------------------------
+
 timer_irq:
 	SYSLOG 16, "PIT "
 	JMP scheduler_yield
+	; tickcounter is not updated! -> does not work with used timer mode
 	
-
 ;------------------------------------------------------------------
 ; M A I N   F U N C T I O N
 ;------------------------------------------------------------------
@@ -89,61 +119,75 @@ main:
 	CALL remap_isr_pm
 	STI ; enable here because flags are copied on task creation
 
+;-------;----------------------------------------------------------
+	; Copied and rewritten in Intel syntax from elfexec subproject
 	;----------------------------------------------------------
-	; Scheduler Tasks Setup
+	; verify ELF file's presence and 32-bit 'executable'.
+	; address the elf headers using the FS segment register
+	;----------------------------------------------------------
+
+	MOV ax, sel_extmem
+	MOV fs, ax
+	CMP DWORD [fs:e_ident], ELF_SIG ; check ELF-file signature
+	JNE .Lelferror                  ;  no, handle elf error
+	CMP BYTE [fs:e_class], ELF_32   ; check file class is 32-bit
+	JNE .Lelferror                  ;  no, handle elf error
+	CMP WORD [fs:e_type], ET_EXEC   ; check type is 'executable'
+	JNE .Lelferror                  ;  no, handle elf error
+
+	;-----------------------------------------------------------
+	; setup segment-registers for 'loading' program-segments
+	;-----------------------------------------------------------
+
+	MOV ax, sel_extmem              ; address ELF file-image
+	MOV ds, ax                      ;  with DS register
+	MOV ax, userDS                  ; address entire memory
+	MOV es, ax                      ;  with ES register
+	CLD                             ; do forward processing
+
+	;-----------------------------------------------------------
+	; extract load-information from the ELF-file's image
+	;-----------------------------------------------------------
+
+	MOV ebx, DWORD [e_phoff]        ; segment-table's offset
+	MOVZX ecx, WORD [e_phnum]       ; count of table entries
+	MOVZX edx, WORD [e_phentsize]   ; length of table entries
+
+.Lnxseg:
+	PUSH ecx                        ; save outer loop-counter
+	MOV eax, DWORD [ebx+p_type]     ; get program-segment type
+	CMP eax, PT_LOAD                ; segment-type 'LOADABLE'?
+	JNE .Lfillx                     ;  no, loading isn't needed
+	MOV esi, DWORD [ebx+p_offset]   ; DS:ESI is segment-source
+	MOV edi, DWORD [ebx+p_paddr]    ; ES:EDI is desired address
+	MOV ecx, DWORD [ebx+p_filesz]   ; ECX is length for copying
+	JECXZ .Lcopyx                   ;  maybe copying is skipped
+	REP MOVSB                       ; 'load' program-segment
+.Lcopyx:
+	MOV ecx, DWORD [ebx+p_memsz]    ; segment-size in memory
+	SUB ecx, DWORD [ebx+p_filesz]   ; minus its size in file
+	JECXZ .Lfillx                   ;  maybe fill is unneeded
+	XOR al, al                      ; use zero for filling
+	REP STOSB                       ; clear leftover space
+.Lfillx:
+	POP ecx                         ; recover outer counter
+	ADD ebx, edx                    ; advance to next record
+	LOOP .Lnxseg                    ; process another record
+
+;-------;----------------------------------------------------------
+
+	;----------------------------------------------------------
+	; Scheduler Tasks Setup (Original loaded ELF-file might be overwritten)
 	;----------------------------------------------------------
 	
-	MOV ebx, proggA
+	MOV ebx, DWORD [fs:e_entry]
+	MOV ax, privDS
+	MOV ds, ax
+	MOV es, ax
+	MOV fs, ax
 	MOV eax, SYS_EXEC
 	INT 0x80
-	MOV DWORD [PIDa], eax
-	MOV ebx, proggB
-	MOV eax, SYS_EXEC
-	INT 0x80
-	MOV DWORD [PIDb], eax
-	MOV ebx, proggC
-	MOV eax, SYS_EXEC
-	INT 0x80
-	MOV DWORD [PIDc], eax
-	MOV ebx, proggD
-	MOV eax, SYS_EXEC
-	INT 0x80
-	MOV DWORD [PIDd], eax
-MOV ebx, proggE
-MOV eax, SYS_EXEC
-INT 0x80
-MOV DWORD [PIDe], eax
-;MOV DWORD [PIDe], -1 ; disable proggE
-
-	;----------------------------------------------------------
-	; Print Process IDs
-	;----------------------------------------------------------
-	
-	; Prepare print loop
-	XOR ecx, ecx
-	MOV cl, "A"
-.print_next:
-	PUSH ecx
-
-	; Prepare text
-	MOV BYTE [proggname], cl
-	MOV eax, DWORD [PIDa-(4*"A")+4*ecx]
-	MOV edi, ascii_dec
-	MOV cx, 0x000A
-	CALL uint32_to_dec
-
-	; Print text
-	MOV ebx, 1
-	MOV edx, string_length
-	MOV ecx, string
-	MOV eax, 0x04
-	INT 0x80
-
-	; Next iteration
-	POP ecx
-	INC ecx
-	CMP cl, "E"
-	JLE .print_next
+	MOV DWORD [PID], eax
 
 	;----------------------------------------------------------
 	; Setup Timer Interrupt
@@ -187,5 +231,11 @@ MOV DWORD [PIDe], eax
 	; Cleanup in case of error
 	;----------------------------------------------------------
 
+.Lelferror:
+	MOV ebx, 1
+	MOV edx, elferrmsglen
+	MOV ecx, elferrmsg
+	MOV eax, 0x04
+	INT 0x80
 	RET
 

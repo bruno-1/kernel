@@ -286,7 +286,7 @@ scheduler_yield:
 GLOBAL scheduler_start
 scheduler_start:
 	; Setup idle task
-	MOV ebx, idle_task
+	MOV ebx, idle_task+0x10000 ; add linear offset (privCS-userCS)
 	CALL context_new
 	TEST eax, eax
 	JNZ .success
@@ -299,7 +299,6 @@ scheduler_start:
 .success:
 
 	; idle task modification
-	MOV DWORD [eax+PCB.PID], 0 ; Fake idle task ID to zero -> one arbitrary ID > 0 is never used
 	PUSH eax
 	CALL setup_idle
 	ADD esp, 4
@@ -325,6 +324,8 @@ scheduler_start:
 
 ;------------------------------------------------------------------
 ; Idle Task -> just yielding to next task
+; Normally resides in privCS but is called with userCS, so
+; different offset needs to be calculated
 ;------------------------------------------------------------------
 idle_task:
 	SYSLOG 15

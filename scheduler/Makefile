@@ -7,11 +7,13 @@
 
 include ../common_defs.mk
 
-BOOTDIR     = ../boot
+BOOTDIR     = ../dasboot
 BOOTLOADER  = $(BOOTDIR)/bootload.bin
 LIBKERNEL   = ../libkernel/libkernel.a
 LDSCRIPT    = ldscript
 PROG        = scheduler
+DEMOAPP     = ../demoapps/demoapp
+RAMDISK     = ../tools/ramdisk
 
 SRCDIR     = src
 OBJDIR     = obj
@@ -30,8 +32,9 @@ TARGETS     = $(PROG).flp
 
 all: $(TARGETS)
 
-$(PROG).flp : $(PROG).bin $(BOOTLOADER)
+$(PROG).flp : $(PROG).bin $(BOOTLOADER) $(DEMOAPP)
 	$(call update-image,$@,$<,$(FLP_USF_POS))
+	@$(RAMDISK) $@ $(FLP_TOC_POS) $(FLP_ELF_POS) $(DEMOAPP)
 
 $(PROG).elf : $(OBJS) $(LIBKERNEL) $(LDSCRIPT)
 	@echo LD -o $@
@@ -53,6 +56,7 @@ $(OBJDIR)/%.o : $(SRCDIR)/%.c
 
 $(PROG).o : ../inc/comgdt.inc
 $(PROG).o : ../common_defs.mk
+$(PROG).flp : $(DEMOAPP)
 
 .PHONY: clean
 clean:
