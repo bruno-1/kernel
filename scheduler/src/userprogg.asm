@@ -62,6 +62,9 @@ BITS 32
 ; Syslog
 %INCLUDE 'src/syslog.inc'
 
+; Scheduler Syscalls
+%INCLUDE 'src/scheduler.inc'
+
 ; Converter "Syscall"
 EXTERN uint32_to_dec
 
@@ -102,7 +105,7 @@ EXTERN uint32_to_dec
 
 	; Yield for other tasks -> Timer takes care of that
 ;	PUSH eax
-;	MOV eax, 24
+;	MOV eax, SYS_YIELD
 ;	INT 0x80
 ;	POP eax
 
@@ -155,16 +158,16 @@ GLOBAL proggE
 proggE:
 	; First yield to other tasks
 	SYSLOG 14, "E 1 "
-	MOV eax, 24
+	MOV eax, SYS_YIELD
 	INT 0x80
 
 	; Start two new tasks
 	MOV ebx, proggE
-	MOV eax, 59
+	MOV eax, SYS_EXEC
 	INT 0x80
 	PUSH eax
 	MOV ebx, proggEndless
-	MOV eax, 59
+	MOV eax, SYS_EXEC
 	INT 0x80
 	PUSH eax
 
@@ -192,13 +195,13 @@ proggE:
 
 	; Yield to other tasks
 	SYSLOG 14, "E 2 "
-	MOV eax, 24
+	MOV eax, SYS_YIELD
 	INT 0x80
 
 	; Kill endless task
 	SYSLOG 14, "E 3 "
 	POP ebx
-	MOV eax, 62
+	MOV eax, SYS_KILL
 	INT 0x80
 	TEST eax, eax
 	JNZ .kill_failed
@@ -217,7 +220,7 @@ proggE:
 
 	; End self
 	ADD esp, 4
-	MOV eax, 60
+	MOV eax, SYS_EXIT
 	INT 0x80
 	CLI
 	HLT
@@ -233,7 +236,7 @@ proggEndless:
 
 	; Make it endless
 	SYSLOG 14, "loop"
-;	MOV eax, 24
+;	MOV eax, SYS_YIELD
 ;	INT 0x80
 	JMP proggEndless
 

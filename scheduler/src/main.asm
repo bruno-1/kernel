@@ -51,6 +51,10 @@ EXTERN uint32_to_dec
 ; Syslog
 %INCLUDE 'src/syslog.inc'
 
+; Scheduler Syscalls
+%INCLUDE 'src/scheduler.inc'
+EXTERN scheduler_start
+
 ; Userprograms
 EXTERN proggA
 EXTERN proggB
@@ -90,23 +94,23 @@ main:
 	;----------------------------------------------------------
 	
 	MOV ebx, proggA
-	MOV eax, 59
+	MOV eax, SYS_EXEC
 	INT 0x80
 	MOV DWORD [PIDa], eax
 	MOV ebx, proggB
-	MOV eax, 59
+	MOV eax, SYS_EXEC
 	INT 0x80
 	MOV DWORD [PIDb], eax
 	MOV ebx, proggC
-	MOV eax, 59
+	MOV eax, SYS_EXEC
 	INT 0x80
 	MOV DWORD [PIDc], eax
 	MOV ebx, proggD
-	MOV eax, 59
+	MOV eax, SYS_EXEC
 	INT 0x80
 	MOV DWORD [PIDd], eax
 MOV ebx, proggE
-MOV eax, 59
+MOV eax, SYS_EXEC
 INT 0x80
 MOV DWORD [PIDe], eax
 ;MOV DWORD [PIDe], -1 ; disable proggE
@@ -158,9 +162,26 @@ MOV DWORD [PIDe], eax
 
 	MOV ax, selTSS
 	LTR ax
-	SUB esp, 8 ; Dummy bytes (simulate call from userspace)
-	MOV eax, 324
-	INT 0x80
+	SUB esp, 72 ; Dummy bytes (simulate interrupt from userspace)
+	MOV ebp, esp
+	CALL scheduler_start
+
+	;----------------------------------------------------------
+	; Deconstruct stack data
+	;----------------------------------------------------------
+
+	; Restore registers
+	POP gs
+        POP fs
+        POP es
+        POP ds
+        POPAD
+
+	; Remove dummy error code and interrupt id 
+	ADD esp, 8
+
+	; Fake interrupt return to switch context to ring 3
+	IRET
 
 	;----------------------------------------------------------
 	; Cleanup in case of error

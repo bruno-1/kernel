@@ -328,7 +328,7 @@ scheduler_start:
 ;------------------------------------------------------------------
 idle_task:
 	SYSLOG 15
-	MOV eax, 24
+	MOV eax, SYS_YIELD
 	INT 0x80
 	JMP idle_task
 

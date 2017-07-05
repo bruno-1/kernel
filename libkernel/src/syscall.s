@@ -19,7 +19,7 @@ svccnt: .space  N_SYSCALLS * 4, 0
         .align      8
 sys_call_table:
         .long   do_nothing   #  0
-        .long   sys_exit     #  1
+        .long   Scheduler_common_stub #  1 (Scheduler exit)
         .long   do_nothing   #  2
         .long   do_nothing   #  3
         .long   sys_write    #  4
@@ -29,28 +29,28 @@ sys_call_table:
         .long   do_nothing   #  8
         .long   do_nothing   #  9
         .long   do_nothing   # 10
-        .long   do_nothing   # 11
+        .long   Scheduler_common_stub # 11 (Scheduler start)
         .long   do_nothing   # 12
         .long   sys_time     # 13
-.rept	10
-        .long   do_nothing   # 14 to 23
+        .long   do_nothing   # 14
+        .long   do_nothing   # 15
+        .long   do_nothing   # 16
+        .long   do_nothing   # 17
+        .long   do_nothing   # 18
+        .long   do_nothing   # 19
+        .long   Scheduler_common_stub # 20 (Scheduler getPID)
+.rept	16
+        .long   do_nothing   # 21 to 36
 .endr
-	.long	Scheduler_common_stub # 24
-.rept	34
-        .long   do_nothing   # 25 to 58
-.endr
-	.long	Scheduler_common_stub # 59
-	.long	Scheduler_common_stub # 60
-        .long   do_nothing   # 61
-	.long	Scheduler_common_stub # 62
-.rept	40
-        .long   do_nothing   # 63 to 102
+	.long	Scheduler_common_stub # 37 (Scheduler kill)
+.rept	65
+        .long   do_nothing   # 38 to 102
 .endr
         .long   sys_syslog   # 103
-.rept	220
-        .long   do_nothing   # 104 to 323
+.rept	54
+        .long   do_nothing   # 104 to 157
 .endr
-	.long	Scheduler_common_stub # 324
+	.long	Scheduler_common_stub # 158 (Scheduler yield)
         .equ    N_SYSCALLS, (.-sys_call_table)/4
 #------------------------------------------------------------------
         .align   16
@@ -182,18 +182,18 @@ sys_syslog:       # for logging data to memory
 #    |   DS ES FS GS   |  <-- ebp
 #    +=================+
 #
-# eax=24  sched_yield (ONLY FROM USER MODE)
-# eax=59  exec (ebx=startAddressOfNewTask)
-# eax=60  exit (ONLY FROM USER MODE)
-# eax=62  kill (ebx=PIDtoKill)
-# eax=324 sched_start
+# eax=1   exit (ONLY FROM USER MODE)
+# eax=11  exec (ebx=startAddressOfNewTask)
+# eax=20  getPID (ONLY FROM USER MODE)
+# eax=37  kill (ebx=PIDtoKill)
+# eax=158 sched_yield (ONLY FROM USER MODE)
 #
 #-----------------------------------------------------------------
 .extern scheduler_newTask
 .extern scheduler_killTask
 .extern scheduler_exit
 .extern scheduler_yield
-.extern scheduler_start
+.extern scheduler_getPID
 
         .align  8
 Scheduler_common_stub:
@@ -238,31 +238,32 @@ Scheduler_common_stub:
 	# Select scheduler function
 	mov 44(%ebp), %eax
 	pushl %ebp
-	cmp $24, %eax
+	cmp $158, %eax # yield
 	jne .next_sched_func0
 	call scheduler_yield
 	jmp .end_sched_func
 .next_sched_func0:
-	cmp $59, %eax
+	cmp $11, %eax # exec
 	jne .next_sched_func1
 	incl ret_code(,1)
 	call scheduler_newTask
 	jmp .end_sched_func
 .next_sched_func1:
-	cmp $60, %eax
+	cmp $1, %eax # exit
 	jne .next_sched_func2
 	call scheduler_exit
 	jmp .end_sched_func
 .next_sched_func2:
-	cmp $62, %eax
+	cmp $37, %eax # kill
 	jne .next_sched_func3
 	incl ret_code(,1)
 	call scheduler_killTask
 	jmp .end_sched_func
 .next_sched_func3:
-	cmp $324, %eax
+	cmp $20, %eax # getPID
 	jne .next_sched_func4
-	call scheduler_start
+	incl ret_code(,1)
+	call sched_getPID # direct call to C function
 	jmp .end_sched_func
 .next_sched_func4:
 	# Error handling for unknown id -> do nothing
@@ -272,7 +273,7 @@ Scheduler_common_stub:
 	# Check return code and save it
 	cmpl $0, ret_code(,1)
 	je .no_ret_code
-	mov %eax, 52(%ebp)
+	mov %eax, 52(%ebp) # save return code on error code (otherwise unused)
 .no_ret_code:
 
 	#----------------------------------------------------------

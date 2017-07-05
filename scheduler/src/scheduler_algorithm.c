@@ -179,6 +179,14 @@ unsigned long sched_getPIDinactive(void)
 	return (*((PCB_t*)((*active).PCB))).PID;
 }
 
+// Get currently active PID
+// IN: ---
+// RET: PID of current task
+unsigned long sched_getPID(void)
+{
+	return (*((PCB_t*)((*active).PCB))).PID;
+}
+
 // Get currently active PCB
 // IN: ---
 // RET: Currently running PCB
