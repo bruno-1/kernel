@@ -7,10 +7,12 @@
 ;------------------------------------------------------------------
 
 SYS_EXIT	EQU 1
+SYS_WAITPID	EQU 7	; ebx = PID to wait for
 SYS_EXEC	EQU 11	; ebx = startadress of new thread
 SYS_GETPID	EQU 20
 SYS_KILL	EQU 37	; ebx = PID to kill
 SYS_YIELD	EQU 158
+SYS_PTHREAD	EQU 350	; ebx = startadress of new thread, ecx = argument, edx = Return address -> pthread_exit()
 
 ;;==================================================================
 ; E X T E R N A L   C - F U N C T I O N S
@@ -75,7 +77,14 @@ EXTERN sched_getPCB
 ;------------------------------------------------------------------
 ; Select ANOTHER PCB
 ; IN: Execution time of old task in ticks
-; RET: Pointer to PCB
+; RET: Pointer to new PCB
 ;------------------------------------------------------------------
 EXTERN sched_next
+
+;------------------------------------------------------------------
+; Select ANOTHER PCB and block current one
+; IN: PID to wait for && Execution time of old task in ticks
+; RET: Pointer to new PCB (0 on error)
+;------------------------------------------------------------------
+EXTERN sched_block
 

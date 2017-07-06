@@ -118,7 +118,7 @@ scheduler_newTask:
 	TEST eax, eax
 	JNZ .success
 	SYSLOG 17
-	MOV eax, 0xFFFFFFFF
+	MOV DWORD [ebp+44], 0xFFFFFFFF
 	RET
 .success:
 
@@ -135,14 +135,58 @@ scheduler_newTask:
 	POP ebx
 	CALL context_del
 	; eax not checked -> can't do anything about failure
-	MOV eax, 0xFFFFFFFF
+	MOV DWORD [ebp+44], 0xFFFFFFFF
 	RET
 
 .space_available:
-	; Cleanup (eax passed thru as return code)
-	ADD esp, 4
+	; Cleanup (eax passed thru as PCB)
+	MOV DWORD [ebp+44], eax
+	POP eax
 	SYSLOG 1
 	RET
+
+;------------------------------------------------------------------
+; INPUT
+;   ebx      Function address for new task
+;   ecx      argument
+;   edx      Return address -> pthread_exit()
+; RETURN
+;   eax      PID (0xFFFFFFFF on failure)
+;------------------------------------------------------------------
+GLOBAL scheduler_newpThread
+scheduler_newpThread:
+	; Passthru newTask
+	CALL scheduler_newTask
+	CMP DWORD [ebp+44], 0xFFFFFFFF
+	JE .cleanup
+
+	; Modify PCB for pThread return
+	MOV ebx, DWORD [eax+PCB.reg_esp]
+	SUB ebx, 12
+	MOV DWORD [eax+PCB.reg_esp], ebx
+	MOV ecx, DWORD [ebp+40]
+	MOV edx, DWORD [ebp+36]
+	PUSH ds
+	MOV eax, DWORD [eax+PCB.reg_ss]
+	MOV ds, ax
+	MOV DWORD [ds:ebx], pThread_exit+0x10000 ; add linear offset (privCS-userCS)
+	MOV DWORD [ds:ebx+4], ecx
+	MOV DWORD [ds:ebx+8], edx
+	POP ds
+
+	; pThread prepared
+.cleanup:
+	RET
+
+	; pThread return code
+pThread_exit:
+	ADD esp, 4
+	XCHG eax, DWORD [esp]
+	CALL eax
+
+	; Kill task in case of failure
+	MOV eax, SYS_EXIT
+	INT 0x80
 
 ;------------------------------------------------------------------
 ; INPUT
@@ -157,7 +201,7 @@ scheduler_killTask:
 	; check PID -> disallow killing of PID 0 (idle task)
 	TEST ebx, ebx
 	JNZ .killOK
-	MOV eax, -1
+	MOV DWORD [ebp+44], 0xFFFFFFFF
 	RET
 .killOK:
 
@@ -168,7 +212,7 @@ scheduler_killTask:
 	; Found something?
 	TEST eax, eax
 	JNZ .found
-	MOV eax, -1
+	MOV DWORD [ebp+44], 0xFFFFFFFF
 	SYSLOG 2
 	JMP .cleanup
 
@@ -177,14 +221,15 @@ scheduler_killTask:
 	MOV ebx, eax
 	CALL context_del
 	TEST eax, eax
+	MOV DWORD [ebp+44], 0xFFFFFFFF
 	JNZ .cleanup
 
 	; Erase task from queue
 	CALL sched_remove
 	TEST eax, eax
-	MOV eax, 0 ; no XOR -> mustn't modify flags!
+	MOV DWORD [ebp+44], 0
 	JNZ .cleanup
-	MOV eax, -1
+	MOV DWORD [ebp+44], 0xFFFFFFFF
 	SYSLOG 2
 	
 	; Cleanup
@@ -214,8 +259,8 @@ scheduler_exit:
 	CALL scheduler_killTask
 
 	; Check if it worked
-	TEST eax, eax
-	JNZ .error
+	CMP DWORD [ebp+44], 0
+	JNE .error
 
 	; Reconfigure PIT -> resets counter so the next task isn't handicapped
 	RESET_PIT
@@ -275,6 +320,60 @@ scheduler_yield:
 
 	; Switch context
 	SYSLOG 6
+	JMP context_switch
+
+;------------------------------------------------------------------
+; (ONLY FROM USER MODE thru INT)
+; INPUT
+;   ebx      PID to wait for
+; RETURN
+;   via context_switch
+;   eax      0xFFFFFFFF on failure
+;------------------------------------------------------------------
+GLOBAL scheduler_waitpid
+scheduler_waitpid:
+	; Calculate execution time
+	PUSH ebx
+	PUSHFD
+	CLI
+	XOR eax, eax
+	MOV edx, PRESCALER
+	MOV al, 0x00 ; Channel 0 read count in latch
+	OUT 0x43, al
+	IN al, 0x40
+	SHL ax, 8
+	IN al, 0x40
+	ROL ax, 8
+	CMP eax, PRESCALER
+	JBE .no_overflow
+	XOR eax, eax
+.no_overflow:
+	SUB edx, eax
+	POPFD
+
+	; Reconfigure PIT -> resets counter on timer interrupt
+	; and on active yield so the next task handicapped
+	RESET_PIT
+
+	; Search current and next PCB & update active
+	PUSH edx
+	CALL sched_getPCB
+	POP edx
+	POP ebx
+	PUSH eax
+	PUSH ebx
+	PUSH edx
+	CALL sched_block
+	TEST eax, eax
+	JNZ .switch
+	MOV DWORD [ebp+44], 0xFFFFFFFF
+	CALL sched_next
+.switch:
+	ADD esp, 8
+	POP ebx
+
+	; Switch context
+	SYSLOG 6, "BLCK"
 	JMP context_switch
 
 ;------------------------------------------------------------------

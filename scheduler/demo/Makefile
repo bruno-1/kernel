@@ -6,25 +6,31 @@
 
 CC          = gcc
 AS          = as
+AR          = ar
 LD          = ld
 NASM        = nasm
 NASMOPT     = -g -f elf -F dwarf -I./syscall/
-CFLAGS      = -Wall -Werror -g -O1 -std=c99
+CFLAGS      = -m32 -Wall -Werror -g -O1 -std=c99 -fno-stack-protector
 GLDFLAGS    = -melf_i386 --warn-common --fatal-warnings
 PS2PDF      = ps2pdf
 A2PS        = a2ps
 AOPT        = --line-numbers=1
 
-TARGETS = userprogg
+TARGETS = ctest userprogg
+LIBSTART = libstartup
+LIBPTHREAD = libpthread
 
 
 .PHONY: all
 .SECONDARY:
 
-all: $(TARGETS)
+all: $(LIBSTART).a $(LIBPTHREAD).a $(TARGETS)
 
-$(TARGETS) : $(TARGETS).o
+userprogg : userprogg.o
 	$(LD) -melf_i386 -o $@ $<
+
+ctest : ctest.o
+	$(LD) -melf_i386 -o $@ $< $(LIBSTART).a
 
 %.o %.lst : %.s
 	@echo AS $<
@@ -33,6 +39,14 @@ $(TARGETS) : $(TARGETS).o
 %.o %.lst : %.asm
 	@echo NASM $<
 	@$(NASM) $(NASMOPT) -l $*.lst -o $@ $<
+
+%.o : %.c
+	@echo GCC $<
+	@$(CC) $(CFLAGS) -o $@ -c $<
+
+%.a : %.o
+	@echo AR $<
+	@$(AR) rcs $@ $<
 
 %.pdf : %.ps
 	$(PS2PDF) $< $@
@@ -45,5 +59,5 @@ $(TARGETS) : $(TARGETS).o
 
 .PHONY: clean
 clean:
-	rm -f *.o *.lst *.ps *.pdf $(TARGETS)
+	rm -f *.a *.o *.lst *.ps *.pdf *.elf $(TARGETS)
 

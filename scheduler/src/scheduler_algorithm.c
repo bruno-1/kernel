@@ -27,6 +27,7 @@ typedef struct {
 	unsigned long PID;
 	unsigned long status;
 	unsigned long ticks;
+	unsigned long wait;
 	// and more but that's irrelevant here
 } PCB_t;
 
@@ -162,6 +163,21 @@ void* sched_remove(unsigned long PID)
 			(*((*ptr).next)).last = (*ptr).last;
 			void* tmp = (*ptr).PCB;
 			(*ptr).PCB = 0;
+
+			// Search if other threads are waiting for this one
+			ptr = &PCBlist[0];
+			do {
+				// Check if blocked and blocked for the right PID
+				if((*((PCB_t*)((*ptr).PCB))).status == 0xFFFFFFFF && (*((PCB_t*)((*ptr).PCB))).wait == (*((PCB_t*)((*((PCBlist_t*)tmp)).PCB))).PID) {
+					// Unblock thread
+					(*((PCB_t*)((*ptr).PCB))).status = 0;
+				}
+
+				// Next entry
+				ptr = (*ptr).next;
+			} while(ptr != &PCBlist[0]);
+
+			// Return removed PCB
 			return tmp;
 		}
 
@@ -200,7 +216,7 @@ void* sched_getPCB(void)
 
 // Select ANOTHER PCB
 // IN: Execution time of old task in ticks
-// RET: Pointer to PCB
+// RET: Pointer to new PCB
 void* sched_next(unsigned long exec_time)
 {
 	// Store tick count
@@ -208,6 +224,36 @@ void* sched_next(unsigned long exec_time)
 
 	// Select next PCB
 	active = (*active).next;
+
+	// Check if it is blocked
+	while((*((PCB_t*)((*active).PCB))).status == 0xFFFFFFFF) {
+		// Possible deadlock if all tasks are blocked -> idle task schould never be blocked
+		active = (*active).next;
+	}
 	return (*active).PCB;
+}
+
+// Select ANOTHER PCB and block current one
+// IN: PID to wait for && Execution time of old task in ticks
+// RET: Pointer to new PCB (0 on error)
+void* sched_block(unsigned long exec_time, unsigned long PID)
+{
+	// Check if PID of other thread exists
+	PCBlist_t* ptr = &PCBlist[0];
+	do {
+		// Compare PID
+		if((*((PCB_t*)((*ptr).PCB))).PID == PID) {
+			// Set blocked and save PID
+			(*((PCB_t*)((*active).PCB))).status = 0xFFFFFFFF;
+			(*((PCB_t*)((*active).PCB))).wait = PID;
+			return sched_next(exec_time);
+		}
+
+		// Next entry
+		ptr = (*ptr).next;
+	} while(ptr != &PCBlist[0]);
+
+	// No matching PID found
+	return 0;
 }
 

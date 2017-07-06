@@ -5,8 +5,6 @@
 #==========  TRAP-HANDLER FOR SUPERVISOR CALLS INT 80h  ===========
 #==================================================================
         .section        .data
-ret_code:
-	.long 0
         .align  16
 svccnt: .space  N_SYSCALLS * 4, 0
 #-------------------------------------------------------------------
@@ -25,7 +23,7 @@ sys_call_table:
         .long   sys_write    #  4
         .long   do_nothing   #  5
         .long   do_nothing   #  6
-        .long   do_nothing   #  7
+        .long   Scheduler_common_stub #  7 (Scheduler waitpid)
         .long   do_nothing   #  8
         .long   do_nothing   #  9
         .long   do_nothing   # 10
@@ -51,6 +49,10 @@ sys_call_table:
         .long   do_nothing   # 104 to 157
 .endr
 	.long	Scheduler_common_stub # 158 (Scheduler yield)
+.rept	191
+        .long   do_nothing   # 159 to 349
+.endr
+	.long	Scheduler_common_stub # 350 (Scheduler pThread_create)
         .equ    N_SYSCALLS, (.-sys_call_table)/4
 #------------------------------------------------------------------
         .align   16
@@ -183,6 +185,7 @@ sys_syslog:       # for logging data to memory
 #    +=================+
 #
 # eax=1   exit (ONLY FROM USER MODE)
+# eax=7   waitpid (ONLY FROM USER MODE)
 # eax=11  exec (ebx=startAddressOfNewTask)
 # eax=20  getPID (ONLY FROM USER MODE)
 # eax=37  kill (ebx=PIDtoKill)
@@ -190,10 +193,12 @@ sys_syslog:       # for logging data to memory
 #
 #-----------------------------------------------------------------
 .extern scheduler_newTask
+.extern scheduler_newpThread
 .extern scheduler_killTask
 .extern scheduler_exit
 .extern scheduler_yield
 .extern scheduler_getPID
+.extern scheduler_waitpid
 
         .align  8
 Scheduler_common_stub:
@@ -220,7 +225,6 @@ Scheduler_common_stub:
         mov %ax, %es
         mov %ax, %gs
         mov %ax, %fs
-	movl $0, ret_code(,1)
 
 	# disable interrupts
 	cli
@@ -230,10 +234,12 @@ Scheduler_common_stub:
 	#----------------------------------------------------------
 
 	# Syslog Ausgabe
+	pushl %edx
 	mov $16, %edx
 	mov $0x30387830, %edi # ASCII '0x80'
 	MOV $103, %eax
 	int $0x80
+	popl %edx
 
 	# Select scheduler function
 	mov 44(%ebp), %eax
@@ -245,7 +251,6 @@ Scheduler_common_stub:
 .next_sched_func0:
 	cmp $11, %eax # exec
 	jne .next_sched_func1
-	incl ret_code(,1)
 	call scheduler_newTask
 	jmp .end_sched_func
 .next_sched_func1:
@@ -256,25 +261,28 @@ Scheduler_common_stub:
 .next_sched_func2:
 	cmp $37, %eax # kill
 	jne .next_sched_func3
-	incl ret_code(,1)
 	call scheduler_killTask
 	jmp .end_sched_func
 .next_sched_func3:
 	cmp $20, %eax # getPID
 	jne .next_sched_func4
-	incl ret_code(,1)
 	call sched_getPID # direct call to C function
+	mov %eax, 44(%ebp) # save return code to stack eax data
 	jmp .end_sched_func
 .next_sched_func4:
+	cmp $7, %eax # waitpid
+	jne .next_sched_func5
+	call scheduler_waitpid
+	jmp .end_sched_func
+.next_sched_func5:
+	cmp $350, %eax # pThread_create
+	jne .next_sched_func6
+	call scheduler_newpThread
+	jmp .end_sched_func
+.next_sched_func6:
 	# Error handling for unknown id -> do nothing
 .end_sched_func:
 	popl %ebp
-
-	# Check return code and save it
-	cmpl $0, ret_code(,1)
-	je .no_ret_code
-	mov %eax, 44(%ebp) # save return code on error code (otherwise unused)
-.no_ret_code:
 
 	#----------------------------------------------------------
 	# Deconstruct stack data

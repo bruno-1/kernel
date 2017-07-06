@@ -11,6 +11,7 @@ STRUC PCB
 .PID:		RESD 1
 .status:	RESD 1
 .ticks:		RESD 1
+.wait:		RESD 1
 
 ; initial values
 .stack:		RESD 1
