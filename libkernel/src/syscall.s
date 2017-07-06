@@ -213,7 +213,6 @@ Scheduler_common_stub:
         pushl %fs
         pushl %gs
         mov %esp, %ebp
-	movl $0, ret_code(,1)
 
         # Segment register setup
 	mov $privDS, %ax
@@ -221,6 +220,7 @@ Scheduler_common_stub:
         mov %ax, %es
         mov %ax, %gs
         mov %ax, %fs
+	movl $0, ret_code(,1)
 
 	# disable interrupts
 	cli
@@ -232,7 +232,7 @@ Scheduler_common_stub:
 	# Syslog Ausgabe
 	mov $16, %edx
 	mov $0x30387830, %edi # ASCII '0x80'
-	MOV $103,  %eax
+	MOV $103, %eax
 	int $0x80
 
 	# Select scheduler function
@@ -273,7 +273,7 @@ Scheduler_common_stub:
 	# Check return code and save it
 	cmpl $0, ret_code(,1)
 	je .no_ret_code
-	mov %eax, 52(%ebp) # save return code on error code (otherwise unused)
+	mov %eax, 44(%ebp) # save return code on error code (otherwise unused)
 .no_ret_code:
 
 	#----------------------------------------------------------
@@ -287,11 +287,7 @@ Scheduler_common_stub:
         popl %ds
         popal
 
-	# Remove error code and interrupt id & modify eax to return code if neccessary
-	cmpl $0, ret_code(,1)
-	je .just_clear
-	mov 4(%esp), %eax
-.just_clear:
+	# Remove error code and interrupt id
 	add $8, %esp
 
 	# enable interrupts
