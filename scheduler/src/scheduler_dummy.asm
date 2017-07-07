@@ -368,12 +368,15 @@ scheduler_waitpid:
 	JNZ .switch
 	MOV DWORD [ebp+44], 0xFFFFFFFF
 	CALL sched_next
+	SYSLOG 6, "BLFa"
+	JMP .switch2
 .switch:
+	SYSLOG 6, "BLCK"
+.switch2:
 	ADD esp, 8
 	POP ebx
 
 	; Switch context
-	SYSLOG 6, "BLCK"
 	JMP context_switch
 
 ;------------------------------------------------------------------

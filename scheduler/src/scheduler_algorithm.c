@@ -168,7 +168,7 @@ void* sched_remove(unsigned long PID)
 			ptr = &PCBlist[0];
 			do {
 				// Check if blocked and blocked for the right PID
-				if((*((PCB_t*)((*ptr).PCB))).status == 0xFFFFFFFF && (*((PCB_t*)((*ptr).PCB))).wait == (*((PCB_t*)((*((PCBlist_t*)tmp)).PCB))).PID) {
+				if((*((PCB_t*)((*ptr).PCB))).status == 0xFFFFFFFF && (*((PCB_t*)((*ptr).PCB))).wait == (*((PCB_t*)tmp)).PID) {
 					// Unblock thread
 					(*((PCB_t*)((*ptr).PCB))).status = 0;
 				}

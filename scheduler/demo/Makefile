@@ -16,7 +16,7 @@ PS2PDF      = ps2pdf
 A2PS        = a2ps
 AOPT        = --line-numbers=1
 
-TARGETS = ctest userprogg
+TARGETS = ctest pthread_demo userprogg
 LIBSTART = libstartup
 LIBPTHREAD = libpthread
 
@@ -31,6 +31,9 @@ userprogg : userprogg.o
 
 ctest : ctest.o
 	$(LD) -melf_i386 -o $@ $< $(LIBSTART).a
+
+pthread_demo : pthread_demo.o
+	$(LD) -melf_i386 -o $@ $< $(LIBSTART).a $(LIBPTHREAD).a
 
 %.o %.lst : %.s
 	@echo AS $<

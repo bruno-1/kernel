@@ -21,6 +21,9 @@ SECTION .data
 
 SECTION .text
 
+; Syslog
+%INCLUDE '../src/syslog.inc'
+
 ; Scheduler functions
 %INCLUDE '../src/scheduler.inc'
 
@@ -57,7 +60,22 @@ write:
 	MOV ebp, esp
 	PUSHAD
 
+	; Syscall selector
+	CMP DWORD [ebp+8], 0
+	JNE .print
+
+	; Syslog Syscall
+	CMP DWORD [ebp+16], 4
+	JB .no_param
+	MOV edx, DWORD [ebp+12]
+	SYSLOG 14, DWORD [edx]
+	JMP .cleanup
+.no_param:
+	SYSLOG 14
+	JMP .cleanup
+
 	; Print Syscall
+.print:
 	MOV eax, 4
 	MOV ebx, DWORD [ebp+8]
 	MOV ecx, DWORD [ebp+12]
@@ -66,6 +84,7 @@ write:
 	MOV eax, DWORD [ebp+16]
 
 	; Restore registers
+.cleanup:
 	POPAD
 	POP ebp
 	RET

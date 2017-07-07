@@ -127,12 +127,13 @@ pthread_join:
 	INT 0x80
 	CMP eax, 0xFFFFFFFF
 	JE .not_found
+	XOR eax, eax
 
 	; Prepare return value
 	CMP DWORD [ebp+12], 0
 	JZ .cleanup
-	MOV eax, DWORD [ebp+12]
-	MOV DWORD [eax], 0 ; Dummy value... -> Should be value from pthread_exit...
+	MOV edx, DWORD [ebp+12]
+	MOV DWORD [edx], 0 ; Dummy value... -> Should be value from pthread_exit...
 	JMP .cleanup
 
 	; Unable to find thread

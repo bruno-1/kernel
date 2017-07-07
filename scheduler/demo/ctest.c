@@ -11,6 +11,10 @@ int main(int argc, char* argv[])
 	int num = 0;
 	num = write(1, str, sizeof(str));
 
+	// Log something
+	const char log[] = "UserProgg!";
+	num += write(0, log, sizeof(log));
+
 	// That's it
 	return num;
 }

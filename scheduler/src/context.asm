@@ -200,13 +200,15 @@ GLOBAL context_switch
 context_switch:
 	; WARNING: eax&ebp values needs to be preserved!
 	; Check if PCB is running
-	CMP DWORD [ebx+PCB.status], 0
-	JNE .switch
+	CMP DWORD [ebx+PCB.status], 1
+	JA .switch
+	JE .switch_run
 	SYSLOG 11, 'FAIL'
 	RET ; task not switched (given PCB not running)
+.switch_run:
+	MOV DWORD [ebx+PCB.status], 0
 .switch:
 	SYSLOG 11
-	MOV DWORD [ebx+PCB.status], 0
 
 	; Genral purpose registers
 	MOV edx, DWORD [ebp+44]

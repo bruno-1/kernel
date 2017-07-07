@@ -14,7 +14,7 @@ LDSCRIPT    = ldscript
 PROG        = scheduler
 RAMDISK     = ../tools/ramdisk
 
-DEMOAPP     = ./demo/userprogg
+DEMOAPP     = ./demo/pthread_demo
 DEMO_DIR    = ./demo
 DEMO_ALL    = $(DEMO_DIR:%=all-%)
 DEMO_CLEAN  = $(DEMO_DIR:%=clean-%)
