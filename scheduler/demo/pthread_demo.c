@@ -11,7 +11,7 @@
 // Globale Variablen //
 ///////////////////////
 
-volatile int sync = 0;
+volatile int my_sync = 0;
 
 //////////////////////
 // Thread-functions //
@@ -137,7 +137,7 @@ void* threadE(void* arg)
 		}
 
 		// Send sync
-		sync = 1;
+		my_sync = 1;
 
 		// Print & log something
 		const char str3[] = "Thread sync";
@@ -148,7 +148,7 @@ void* threadE(void* arg)
 		// Wait for sync
 		char str[] = "Thread Ym X";
 		str[10] = argument;
-		while(!sync) {
+		while(!my_sync) {
 			// Print & log something
 			num += write(0, str+7, sizeof(str)-7);
 			num += write(1, str, sizeof(str));

@@ -1,4 +1,5 @@
 # Exclude executables and object files
+*.a
 *.bin
 *.elf
 *.hex
@@ -32,6 +33,9 @@
 demoapps/demoapp
 demoapps/linuxapp
 local/
+scheduler/demo/ctest
+scheduler/demo/userprogg
+scheduler/demo/pthread_demo
 tools/ramdisk
 
 # Include some specific files
