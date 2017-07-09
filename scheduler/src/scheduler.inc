@@ -6,17 +6,27 @@
 ; Scheduler Syscall IDs
 ;------------------------------------------------------------------
 
+; usermode only
 SYS_EXIT	EQU 1
 SYS_WAITPID	EQU 7	; ebx = PID to wait for
-SYS_EXEC	EQU 11	; ebx = startadress of new thread
 SYS_GETPID	EQU 20
-SYS_KILL	EQU 37	; ebx = PID to kill
 SYS_YIELD	EQU 158
 SYS_PTHREAD	EQU 350	; ebx = startadress of new thread, ecx = argument, edx = Return address -> pthread_exit()
 
-;;==================================================================
+; user- and kernelmode
+SYS_EXEC	EQU 11	; ebx = startadress of new thread
+SYS_KILL	EQU 37	; ebx = PID to kill
+
+;==================================================================
 ; E X T E R N A L   C - F U N C T I O N S
 ;==================================================================
+
+;------------------------------------------------------------------
+; cdecl Calling convention
+;
+; eax, ecx, edx and flags might be changed in called function
+; parameters are passed on stack from right to left
+;------------------------------------------------------------------
 
 ;------------------------------------------------------------------
 ; IMPORTANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -3,6 +3,11 @@
 ;
 ; Custom pThreads implementation for custom scheduler
 ;
+; Differences to original:
+; - pThreads will not automatically be killed if main programm exits
+; - pThread Join will not provide exit code from thread function
+;    Implementation would need additional parameter in waitpid syscall...
+;
 ;-----------------------------------------------------------------
 
 ;==================================================================
@@ -39,126 +44,176 @@ SECTION .text
 ; P U B L I C   F U N C T I O N S
 ;------------------------------------------------------------------
 
-; Cancel running pThread
+;------------------------------------------------------------------
+; C a n c e l   r u n n i n g   p T h r e a d
+;------------------------------------------------------------------
 GLOBAL pthread_cancel
 pthread_cancel:
+	;----------------------------------------------------------
 	; Save registers
-	PUSH ebp
-	MOV ebp, esp
-	PUSH ebx
+	;----------------------------------------------------------
 
+	PUSH ebp		; Create stackframe
+	MOV ebp, esp		; Prepare base pointer
+	PUSH ebx		; Save register
+
+	;----------------------------------------------------------
 	; Try to kill thread
+	;----------------------------------------------------------
+
 	MOV eax, SYS_KILL
-	MOV ebx, DWORD [ebp+8]
-	INT 0x80
-	TEST eax, eax
-	JZ .cleanup
+	MOV ebx, DWORD [ebp+8]	; PID to kill
+	INT 0x80		; Kill-Syscall
+	TEST eax, eax		; check if it worked
+	JZ .cleanup		; yes
+	MOV eax, ESRCH		; Unable to kill thread -> set error code
 
-	; Unable to kill thread
-	MOV eax, ESRCH
-
+	;----------------------------------------------------------
 	; Cleanup
-.cleanup:
-	POP ebx
-	POP ebp
-	RET
+	;----------------------------------------------------------
 
-; Create new pThread
+.cleanup:
+	POP ebx			; Restore base pointer
+	POP ebp			; Leave stackframe
+	RET			; eax is passed thru as return value
+
+;------------------------------------------------------------------
+; C r e a t e   n e w   p T h r e a d
+;------------------------------------------------------------------
 GLOBAL pthread_create
 pthread_create:
+	;----------------------------------------------------------
 	; Save registers
-	PUSH ebp
-	MOV ebp, esp
-	PUSH ebx
+	;----------------------------------------------------------
 
+	PUSH ebp		; Create stackframe
+	MOV ebp, esp		; Prepare base pointer
+	PUSH ebx		; Save register
+
+	;----------------------------------------------------------
 	; Create new pThread (attributes are ignored)
-	MOV eax, SYS_PTHREAD
-	MOV ebx, DWORD [ebp+16]
-	MOV ecx, DWORD [ebp+20]
-	MOV edx, pthread_exit
-	INT 0x80
-	CMP eax, 0xFFFFFFFF
-	JE .fail
-	CMP DWORD [ebp+8], 0
-	JE .fail
-	MOV edx, DWORD [ebp+8]
-	MOV DWORD [edx], eax
-	XOR eax, eax
-	JMP .cleanup
+	;----------------------------------------------------------
 
-	; Unable to create thread
+	MOV eax, SYS_PTHREAD	
+	MOV ebx, DWORD [ebp+16]	; function address to run as thread
+	MOV ecx, DWORD [ebp+20]	; void* argument of function
+	MOV edx, pthread_exit	; pointer to be invoked when function returns
+	INT 0x80		; Modified thread create syscall
+	CMP eax, 0xFFFFFFFF	; check if it worked
+	JE .fail		; no
+	CMP DWORD [ebp+8], 0	; Check if out_ptr is zero
+	JE .fail		; yes
+	MOV edx, DWORD [ebp+8]	; Load out_ptr
+	MOV DWORD [edx], eax	; store PID in out_ptr
+	XOR eax, eax		; set return code success
+	JMP .cleanup		; jump to cleanup
 .fail:
-	MOV eax, EAGAIN
+	MOV eax, EAGAIN		; Unable to create thread -> set error code
 
+	;----------------------------------------------------------
 	; Cleanup
-.cleanup:
-	POP ebx
-	POP ebp
-	RET
+	;----------------------------------------------------------
 
-; Exit current pThread
+.cleanup:
+	POP ebx			; Restore base pointer
+	POP ebp			; Leave stackframe
+	RET			; eax is passed thru as return value
+
+;------------------------------------------------------------------
+; E x i t   c u r r e n t   p T h r e a d
+;------------------------------------------------------------------
 GLOBAL pthread_exit
 pthread_exit:
-	; Prepare stackpointer
-	MOV ebp, esp
+	;----------------------------------------------------------
+	; Process passed values
+	;----------------------------------------------------------
 
-	; Passed value is dicarded... -> Should be given to joining members...
-	MOV edx, DWORD [ebp+4]
+	MOV ebp, esp		; Prepare base pointer
+	MOV edx, DWORD [ebp+4]	; Passed value is dicarded... -> Should be given to joining members...
 
-	; Call exit
+	;----------------------------------------------------------
+	; Syscall to kill self
+	;----------------------------------------------------------
+
 	MOV eax, SYS_EXIT
 	INT 0x80
 
+	;----------------------------------------------------------
 	; Error
-.cleanup:
-	JMP $
+	;----------------------------------------------------------
 
-; Join running pThread
+.cleanup:
+	JMP $			; Loop endlessly
+
+;------------------------------------------------------------------
+; J o i n   r u n n i n g   p T h r e a d
+;------------------------------------------------------------------
 GLOBAL pthread_join
 pthread_join:
+	;----------------------------------------------------------
 	; Save registers
-	PUSH ebp
-	MOV ebp, esp
-	PUSH ebx
+	;----------------------------------------------------------
 
+	PUSH ebp		; Create stackframe
+	MOV ebp, esp		; Prepare base pointer
+	PUSH ebx		; Save register
+
+	;----------------------------------------------------------
 	; Try to wait for thread
+	;----------------------------------------------------------
+
 	MOV eax, SYS_WAITPID
-	MOV ebx, DWORD [ebp+8]
-	INT 0x80
-	CMP eax, 0xFFFFFFFF
-	JE .not_found
-	XOR eax, eax
+	MOV ebx, DWORD [ebp+8]	; PID to wait for
+	INT 0x80		; waitpid syscall
+	CMP eax, 0xFFFFFFFF	; check if it worked (result not -1)
+	JE .not_found		; it did not work
+	XOR eax, eax		; set return code success
 
+	;----------------------------------------------------------
 	; Prepare return value
-	CMP DWORD [ebp+12], 0
-	JZ .cleanup
-	MOV edx, DWORD [ebp+12]
-	MOV DWORD [edx], 0 ; Dummy value... -> Should be value from pthread_exit...
-	JMP .cleanup
+	;----------------------------------------------------------
 
-	; Unable to find thread
+	CMP DWORD [ebp+12], 0	; Check if out_ptr is zero
+	JZ .cleanup		; it is, so do not copy value
+	MOV edx, DWORD [ebp+12]	; Load out_ptr
+	MOV DWORD [edx], 0	; Write dummy value to out_ptr -> Should be value from pthread_exit...
+	JMP .cleanup		; jump to cleanup
 .not_found:
-	MOV eax, ESRCH
+	MOV eax, ESRCH		; Unable to find thread -> set error code
 
+	;----------------------------------------------------------
 	; Cleanup
-.cleanup:
-	POP ebx
-	POP ebp
-	RET
+	;----------------------------------------------------------
 
-; Get own pThread ID
+.cleanup:
+	POP ebx			; Restore base pointer
+	POP ebp			; Leave stackframe
+	RET			; eax is passed thru as return value
+
+;------------------------------------------------------------------
+; G e t   o w n   p T h r e a d   I D
+;------------------------------------------------------------------
 GLOBAL pthread_self
 pthread_self:
+	;----------------------------------------------------------
 	; Save registers
-	PUSH ebp
-	MOV ebp, esp
+	;----------------------------------------------------------
 
-	; Try to wait for thread
+	PUSH ebp		; Create stackframe
+	MOV ebp, esp		; Prepare base pointer
+
+	;----------------------------------------------------------
+	; Syscall to get self PID
+	;----------------------------------------------------------
+
 	MOV eax, SYS_GETPID
 	INT 0x80
 
+	;----------------------------------------------------------
 	; Cleanup
+	;----------------------------------------------------------
+
 .cleanup:
-	POP ebp
-	RET
+	POP ebp			; Leave stackframe
+	RET			; eax is passed thru as return value
 

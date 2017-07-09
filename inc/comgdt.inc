@@ -59,7 +59,7 @@
         #----------------------------------------------------------
         # Expand-Up Stack Segment Descriptor
         # Code/Data, 32 bit, Byte, Priv 0, Type 0x02, 'Read/Write'
-        # Base Address: 0x00020000   Limit: 0x0007FFFF
+        # Base Address: 0x0000C000   Limit: 0x00003FFF
         .equ    privSS, (.-theGDT)+0    # selector for ring0 data
         .global privSS
         .quad   0x00479200C0003FFF      # stack segment-descriptor

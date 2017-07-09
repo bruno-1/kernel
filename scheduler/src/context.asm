@@ -2,6 +2,10 @@
 ; context.asm
 ;
 ; Context switching core algorithms to be used by scheduler
+; Architecture specific
+;
+; These wrapper function do not save any registers as they will
+; be restored by interrupt return anyways
 ;
 ;-----------------------------------------------------------------
 
@@ -9,9 +13,9 @@
 ; C O N S T A N T S
 ;==================================================================
 
-STACKBUFFER_SIZE EQU 0x3FC ; size of stack per task
+STACKBUFFER_SIZE EQU 0x3FC ; size of stack per task (1KB)
 
-; Memory addrs for stack and pcb storage
+; Memory addrs for stack and PCB storage (privDS offset is added for physical addresses)
 PCBBUFFER_ADDR EQU 0x100000
 PCBBUFFER_MAX EQU 0x200000
 STACKBUFFER_ADDR EQU 0x200000
@@ -43,16 +47,6 @@ used_stack dd 0
 
 currPID dd 1 ; 0 is reserved for idle task
 
-;------------------------------------------------------------------
-; F U N C T I O N   D A T A
-;------------------------------------------------------------------
-
-; as additional parameters
-GLOBAL context_current_PCB
-context_current_PCB: dd 0
-GLOBAL context_new_PCB
-context_new_PCB: dd 0
-
 ;==================================================================
 ; S E C T I O N   C O D E
 ;==================================================================
@@ -83,43 +77,59 @@ EXTERN userDS
 ;------------------------------------------------------------------
 GLOBAL context_new
 context_new:
+	;----------------------------------------------------------
 	; Setup new stack
-	PUSH ebx
-	CALL stack_malloc
-	TEST eax, eax
-	JNZ .success_stack
-	ADD esp, 4
+	;----------------------------------------------------------
+
+	PUSH ebx				; Store new task address
+	CALL stack_malloc			; allocate stack space
+	TEST eax, eax				; check if it worked
+	JNZ .success_stack			; it worked
+	ADD esp, 4				; remove parameter from stack
 	SYSLOG 19, 'stck'
-	RET
+	RET					; return eax is passed thru as error code
 .success_stack:
+
+	;----------------------------------------------------------
 	; Setup new PCB
-	PUSH eax
-	CALL pcb_malloc
-	TEST eax, eax
-	JNZ .success_pcb
-	ADD esp, 8
+	;----------------------------------------------------------
+
+	PUSH eax				; Store user stack ptr on stack
+	CALL pcb_malloc				; allocate PCB space
+	TEST eax, eax				; check if it worked
+	JNZ .success_pcb			; it worked
+	ADD esp, 8				; remove parameter from stack
 	SYSLOG 19, 'PCB '
-	RET
+	RET					; return eax is passed thru as error code
 .success_pcb:
-	POP edx
+	POP edx					; Recover user stack ptr
 
+	;----------------------------------------------------------
 	; Check PID overflow
-	MOV ebx, DWORD [currPID]
-	CMP ebx, 0xFFFFFFFF
-	JNE .no_overflow
-	ADD esp, 4
-	XOR eax, eax
-	SYSLOG 19, 'PID '
-	RET
-.no_overflow:
-	INC DWORD [currPID]
+	;----------------------------------------------------------
 
+	MOV ebx, DWORD [currPID]		; get new current PID
+	CMP ebx, 0xFFFFFFFF			; check for overflow
+	JNE .no_overflow			; no
+	ADD esp, 4				; Remove parameter address from stack
+	XOR eax, eax				; set error code
+	SYSLOG 19, 'PID '
+	RET					; return eax is passed thru as error code
+.no_overflow:
+	INC DWORD [currPID]			; Increment PID for next task
+
+	;----------------------------------------------------------
 	; Fill new PCB
+	;----------------------------------------------------------
+
+	; General information
 	MOV DWORD [eax+PCB.PID], ebx
-	MOV DWORD [eax+PCB.status], 0
-	MOV DWORD [eax+PCB.ticks], 0
-	MOV DWORD [eax+PCB.wait], 0
-	POP ebx
+	MOV DWORD [eax+PCB.status], 0		; not running = ready
+	MOV DWORD [eax+PCB.ticks], 0		; last execution time is zero
+	MOV DWORD [eax+PCB.wait], 0		; ready, so not waiting
+
+	; Instruction Pointer related stuff
+	POP ebx					; Restore userprog start address from stack
 	MOV DWORD [eax+PCB.progg], ebx
 	MOV DWORD [eax+PCB.reg_eip], ebx
 	MOV DWORD [eax+PCB.reg_cs], userCS
@@ -128,11 +138,11 @@ context_new:
 	MOV ebx, DWORD [ebp+64]
 	MOV DWORD [eax+PCB.reg_eflags], ebx
 
-	; Setup stack
-	MOV DWORD [eax+PCB.stack], edx
-	MOV DWORD [eax+PCB.stack_size], STACKBUFFER_SIZE
-	ADD edx, STACKBUFFER_SIZE
-	MOV DWORD [eax+PCB.reg_esp], edx
+	; Setup stack (except ss)
+	MOV DWORD [eax+PCB.stack], edx		; stack bottom
+	MOV DWORD [eax+PCB.stack_size], STACKBUFFER_SIZE	; save stack size
+	ADD edx, STACKBUFFER_SIZE		; add stacksize to stack bottom
+	MOV DWORD [eax+PCB.reg_esp], edx	; store stack top
 
 	; General purpose registers
 	XOR ebx, ebx
@@ -152,9 +162,12 @@ context_new:
 	MOV DWORD [eax+PCB.reg_fs], ebx
 	MOV DWORD [eax+PCB.reg_gs], ebx
 
+	;----------------------------------------------------------
 	; Cleanup
+	;----------------------------------------------------------
+
 	SYSLOG 9
-	RET
+	RET					; return eax is passed thru as PCB ptr
 
 ;------------------------------------------------------------------
 ; INPUT
@@ -164,26 +177,38 @@ context_new:
 ;------------------------------------------------------------------
 GLOBAL context_del
 context_del:
+	;----------------------------------------------------------
 	; Check running or blocked
-	MOV eax, DWORD [ebx+PCB.status]
-	TEST eax, eax
-	JNZ .running
+	;----------------------------------------------------------
+	
+	MOV eax, DWORD [ebx+PCB.status]	; get status from PCB
+	TEST eax, eax			; check status
+	JNZ .running			; running or blocked
 
-	; free PCB and stack
-	MOV DWORD [ebx-4], 0
-	MOV ebx, DWORD [ebx+PCB.stack]
-	MOV DWORD [ebx-4], 0
+	;----------------------------------------------------------
+	; Free PCB and stack
+	;----------------------------------------------------------
 
+	MOV DWORD [ebx-4], 0		; free PCB -> still valid till function return
+	MOV ebx, DWORD [ebx+PCB.stack]	; get stack-bottom from PCB
+	MOV DWORD [ebx-4], 0		; free user stack
+
+	;----------------------------------------------------------
 	; Cleanup
-	XOR eax, eax
-	SYSLOG 10
-	RET
+	;----------------------------------------------------------
 
-	; Task is running
+	XOR eax, eax			; set return code success
+	SYSLOG 10
+	RET				; return eax is passed thru as error code
+
+	;----------------------------------------------------------
+	; Task is running or blocked
+	;----------------------------------------------------------
+
 .running:
-	MOV eax, -1
+	MOV eax, -1			; set error code
 	SYSLOG 10, 'FAIL'
-	RET
+	RET				; return eax is passed thru as error code
 
 ;==================================================================
 ; M A I N   J U M P S
@@ -199,111 +224,82 @@ context_del:
 GLOBAL context_switch
 context_switch:
 	; WARNING: eax&ebp values needs to be preserved!
+	;----------------------------------------------------------
 	; Check if PCB is running
-	CMP DWORD [ebx+PCB.status], 1
-	JA .switch
-	JE .switch_run
+	;----------------------------------------------------------
+
+	CMP DWORD [ebx+PCB.status], 1	; Check status
+	JA .switch			; blocked -> do not change status
+	JE .switch_run			; executing
 	SYSLOG 11, 'FAIL'
-	RET ; task not switched (given PCB not running)
+	RET				; task not switched (given PCB not running)
 .switch_run:
-	MOV DWORD [ebx+PCB.status], 0
+	MOV DWORD [ebx+PCB.status], 0	; set to ready if previously executing
 .switch:
 	SYSLOG 11
 
-	; Genral purpose registers
-	MOV edx, DWORD [ebp+44]
-	MOV DWORD [ebx+PCB.reg_eax], edx
-	MOV edx, DWORD [ebp+40]
-	MOV DWORD [ebx+PCB.reg_ecx], edx
-	MOV edx, DWORD [ebp+36]
-	MOV DWORD [ebx+PCB.reg_edx], edx
-	MOV edx, DWORD [ebp+32]
-	MOV DWORD [ebx+PCB.reg_ebx], edx
-	MOV edx, DWORD [ebp+68]
-	MOV DWORD [ebx+PCB.reg_esp], edx
-	MOV edx, DWORD [ebp+24]
-	MOV DWORD [ebx+PCB.reg_ebp], edx
-	MOV edx, DWORD [ebp+20]
-	MOV DWORD [ebx+PCB.reg_esi], edx
-	MOV edx, DWORD [ebp+16]
-	MOV DWORD [ebx+PCB.reg_edi], edx
+	;----------------------------------------------------------
+	; Save registers
+	;----------------------------------------------------------
 
-	; Segment registers
-	MOV edx, DWORD [ebp+72]
-	MOV DWORD [ebx+PCB.reg_ss], edx
-	MOV edx, DWORD [ebp+12]
-	MOV DWORD [ebx+PCB.reg_ds], edx
-	MOV edx, DWORD [ebp+8]
-	MOV DWORD [ebx+PCB.reg_es], edx
-	MOV edx, DWORD [ebp+4]
-	MOV DWORD [ebx+PCB.reg_fs], edx
-	MOV edx, DWORD [ebp]
-	MOV DWORD [ebx+PCB.reg_gs], edx
+	MOV ecx, 19			; dwords to copy (reg_gs to reg_ss in PCB)
+	LEA edi, [ebx+PCB.reg_gs]	; dest addr in PCB
+	MOV esi, ebp			; src addr from stack
+	PUSH ds				; Save data segment
+	MOV edx, ss			; Load stack segment
+	MOV ds, edx			; Replace data with stack segment
+	CLD				; Process copy upwards
+	REP MOVSD			; Move dword from ds:esi to es:edi and decrement ecx by 1
+	POP ds				; Restore data segment
 
-	; Special registers
-	MOV edx, DWORD [ebp+64]
-	MOV DWORD [ebx+PCB.reg_eflags], edx
-	MOV edx, DWORD [ebp+60]
-	MOV DWORD [ebx+PCB.reg_cs], edx
-	MOV edx, DWORD [ebp+56]
-	MOV DWORD [ebx+PCB.reg_eip], edx
-
+	;----------------------------------------------------------
 	; Set new context
+	;----------------------------------------------------------
+
 	SYSLOG 12
-	JMP context_set
+	JMP context_set			; Set next task -> eax is passed thru
 
 ;------------------------------------------------------------------
 ; INPUT
 ;   eax      Pointer to new PCB
 ; RETURN
-;   none
+;   none -> go to interrupt for IRET
 ;------------------------------------------------------------------
 GLOBAL context_set
 context_set:
-	; Read from PCB
-	MOV DWORD [eax+PCB.status], 1
+	;----------------------------------------------------------
+	; Change PCB status
+	;----------------------------------------------------------
 
-	; Segment registers
-	MOV ebx, DWORD[eax+PCB.reg_ss]
-	MOV DWORD [ebp+72], ebx
-	MOV ebx, DWORD[eax+PCB.reg_ds]
-	MOV DWORD [ebp+12], ebx
-	MOV ebx, DWORD[eax+PCB.reg_es]
-	MOV DWORD [ebp+8], ebx
-	MOV ebx, DWORD[eax+PCB.reg_fs]
-	MOV DWORD [ebp+4], ebx
-	MOV ebx, DWORD[eax+PCB.reg_gs]
-	MOV DWORD [ebp], ebx
+	MOV DWORD [eax+PCB.status], 1		; Set status as executing
 
-	; General purpose registers
-	MOV ebx, DWORD[eax+PCB.reg_eax]
-	MOV DWORD [ebp+44], ebx
-	MOV ebx, DWORD[eax+PCB.reg_ecx]
-	MOV DWORD [ebp+40], ebx
-	MOV ebx, DWORD[eax+PCB.reg_edx]
-	MOV DWORD [ebp+36], ebx
-	MOV ebx, DWORD[eax+PCB.reg_ebx]
-	MOV DWORD [ebp+32], ebx
-	MOV ebx, DWORD[eax+PCB.reg_esp]
-	MOV DWORD [ebp+68], ebx
-	MOV ebx, DWORD[eax+PCB.reg_ebp]
-	MOV DWORD [ebp+24], ebx
-	MOV ebx, DWORD[eax+PCB.reg_esi]
-	MOV DWORD [ebp+20], ebx
-	MOV ebx, DWORD[eax+PCB.reg_edi]
-	MOV DWORD [ebp+16], ebx
+	;----------------------------------------------------------
+	; Restore registers
+	;----------------------------------------------------------
 
-	; Special registers
-	MOV ebx, DWORD[eax+PCB.reg_eip]
-	MOV DWORD [ebp+56], ebx
-	MOV ebx, DWORD[eax+PCB.reg_cs]
-	MOV DWORD [ebp+60], ebx
-	MOV ebx, DWORD[eax+PCB.reg_eflags]
-	MOV DWORD [ebp+64], ebx
+	; Save interrupt ID and error code (later copied back by MOVSD)
+	MOV edx, DWORD [ebp+48]			; Load interrupt ID from stack
+	MOV DWORD[eax+PCB.reg_dummy_1], edx	; and store in PCB
+	MOV edx, DWORD [ebp+52]			; Load error code from stack
+	MOV DWORD[eax+PCB.reg_dummy_2], edx	; and store in PCB
 
+	; Actual copying
+	MOV ecx, 19				; dwords to copy (reg_gs to reg_ss in PCB)
+	MOV edi, ebp				; dest addr in PCB
+	LEA esi, [eax+PCB.reg_gs]		; src addr from stack
+	PUSH es					; Save data segment
+	MOV edx, ss				; Load stack segment
+	MOV es, edx				; Replace data with stack segment
+	CLD					; Process copy upwards
+	REP MOVSD				; Move dword from ds:esi to es:edi and decrement ecx by 1
+	POP es					; Restore data segment
+
+	;----------------------------------------------------------
 	; Return to switched in context
+	;----------------------------------------------------------
+
 	SYSLOG 13
-	RET
+	RET					; return to interrupt handler
 
 ;------------------------------------------------------------------
 ; H E L P E R   F U N C T I O N S
@@ -316,38 +312,47 @@ context_set:
 ;   eax      Pointer to PCB (0 on failure)
 ;------------------------------------------------------------------
 pcb_malloc:
+	;----------------------------------------------------------
 	; Load PCB buffer
-	MOV eax, PCBBUFFER_ADDR
-	MOV ebx, DWORD [used_pcbs]
-	XOR ecx, ecx
+	;----------------------------------------------------------
 
+	MOV eax, PCBBUFFER_ADDR			; load base address
+	MOV ebx, DWORD [used_pcbs]		; get number of used PCBs
+	XOR ecx, ecx				; clear counter
+
+	;----------------------------------------------------------
 	; Loop to find free space
+	;----------------------------------------------------------
+
 .next:
-	CMP ecx, ebx
-	JAE .new_space
-	CMP DWORD [eax], 0
-	JE .unused
-	ADD eax, (PCB.size+4)
-	INC ecx
-	JMP .next
+	CMP ecx, ebx				; compare counter to used PCBs
+	JAE .new_space				; counter above used PCBs -> new space needed
+	CMP DWORD [eax], 0			; see if current PCB is in use
+	JE .unused				; no, so reuse it
+	ADD eax, (PCB.size+4)			; move to next PCB
+	INC ecx					; increment counter
+	JMP .next				; next iteration
 .new_space:
 	; eax points to first free space
-	INC ebx
+	INC ebx					; increment max PCBs
 .unused:
 	; eax points to now unused space
 
 	; Check if max address is overreached
-	CMP eax, PCBBUFFER_MAX-(PCB.size+4)
-	JB .free_space
-	XOR eax, eax
-	RET
+	CMP eax, PCBBUFFER_MAX-(PCB.size+4)	; compare current to max address
+	JB .free_space				; below, so OK
+	XOR eax, eax				; otherwise set error code 0
+	RET					; return eax is passed thru as error code
 .free_space:
-	MOV DWORD [used_pcbs], ebx
+	MOV DWORD [used_pcbs], ebx		; Save new PCB count
 
+	;----------------------------------------------------------
 	; Claim space & return
-	MOV DWORD [eax], 1
-	ADD eax, 4
-	RET
+	;----------------------------------------------------------
+
+	MOV DWORD [eax], 1			; set space as used
+	ADD eax, 4				; increment counter beyond used flag
+	RET					; return eax is passed thru as PCB ptr
 
 ;------------------------------------------------------------------
 ; INPUT
@@ -356,36 +361,45 @@ pcb_malloc:
 ;   eax      Pointer to stack (0 on failure)
 ;------------------------------------------------------------------
 stack_malloc:
+	;----------------------------------------------------------
 	; Load stack buffer
-	MOV eax, STACKBUFFER_ADDR
-	MOV ebx, DWORD [used_stack]
-	XOR ecx, ecx
+	;----------------------------------------------------------
 
+	MOV eax, STACKBUFFER_ADDR			; load base address
+	MOV ebx, DWORD [used_stack]			; get number of used user stacks
+	XOR ecx, ecx					; clear counter
+
+	;----------------------------------------------------------
 	; Loop to find free space
+	;----------------------------------------------------------
+
 .next:
-	CMP ecx, ebx
-	JAE .new_space
-	CMP DWORD [eax], 0
-	JE .unused
-	ADD eax, (STACKBUFFER_SIZE+4)
-	INC ecx
-	JMP .next
+	CMP ecx, ebx					; compare counter to used stacks
+	JAE .new_space					; counter above used stacks -> new space needed
+	CMP DWORD [eax], 0				; see if current stack is in use
+	JE .unused					; no, so reuse it
+	ADD eax, (STACKBUFFER_SIZE+4)			; move to next stack
+	INC ecx						; increment counter
+	JMP .next					; next iteration
 .new_space:
 	; eax points to first free space
-	INC ebx
+	INC ebx						; increment max user stacks
 .unused:
 	; eax points to now unused space
 
 	; Check if max address is overreached
-	CMP eax, STACKBUFFER_MAX-(STACKBUFFER_SIZE+4)
-	JB .free_space
-	XOR eax, eax
-	RET
+	CMP eax, STACKBUFFER_MAX-(STACKBUFFER_SIZE+4)	; compare current to max address
+	JB .free_space					; below, so OK
+	XOR eax, eax					; otherwise set error code 0
+	RET						; return eax is passed thru as error code
 .free_space:
-	MOV DWORD [used_stack], ebx
+	MOV DWORD [used_stack], ebx			; Save new PCB count
 
+	;----------------------------------------------------------
 	; Claim space & return
-	MOV DWORD [eax], 1
-	ADD eax, 4
-	RET
+	;----------------------------------------------------------
+
+	MOV DWORD [eax], 1				; set space as used
+	ADD eax, 4					; increment counter beyond used flag
+	RET						; return eax is passed thru as user stack ptr
 

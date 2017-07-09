@@ -405,7 +405,7 @@ configure_16550_uart:
 # protected mode stack pointer and segment
 #------------------------------------------------------------------
         .align  4
-pmstack:.long   0x50000                 # 48-bit ss:esp (32-bit PM)
+pmstack:.long   0x3FFE                 # 48-bit ss:esp (32-bit PM)
         .word   privSS
 
 #------------------------------------------------------------------

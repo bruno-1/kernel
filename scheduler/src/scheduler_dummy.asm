@@ -4,6 +4,9 @@
 ; Dummy functions:
 ; ASM wrapper library for C code with minimal functionality
 ;
+; These wrapper function do not save any registers as they will
+; be restored by interrupt return anyways
+;
 ;-----------------------------------------------------------------
 
 ;==================================================================
@@ -42,12 +45,6 @@
 ;    |  Segment  Regs  |
 ;    |   DS ES FS GS   |  <-- ebp
 ;    +=================+
-;
-; eax=24  sched_yield
-; eax=59  exec (ebx=startAddressOfNewTask)
-; eax=60  exit
-; eax=62  kill (ebx=PIDtoKill)
-; eax=324 sched_start
 ;
 ;-----------------------------------------------------------------
 
@@ -107,82 +104,108 @@ BITS 32
 
 ;------------------------------------------------------------------
 ; INPUT
-;   ebx      Function address for new task
+;   ebx			Function address for new task
 ; RETURN
-;   eax      PID (0xFFFFFFFF on failure)
+;   eax on STACK	PID (0xFFFFFFFF on failure)
 ;------------------------------------------------------------------
 GLOBAL scheduler_newTask
 scheduler_newTask:
-	; Create new context ebx is passed thru
-	CALL context_new
+	;----------------------------------------------------------
+	; Create new context
+	;----------------------------------------------------------
+
+	CALL context_new		; ebx is passed thru
 	TEST eax, eax
-	JNZ .success
+	JNZ .success			; context created
 	SYSLOG 17
-	MOV DWORD [ebp+44], 0xFFFFFFFF
-	RET
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack
+	RET				; return to interrupt handler
 .success:
 
+	;----------------------------------------------------------
 	; Call C-function
-	PUSH eax
-	CALL sched_new
+	;----------------------------------------------------------
 
-	; Check if there actually was space available
-	CMP eax, 0xFFFFFFFF
-	JB .space_available
+	PUSH eax			; Preserve PCB ptr
+	CALL sched_new			; C function overwrites registers
+	CMP eax, 0xFFFFFFFF		; Check if there actually was space available
+	JB .space_available		; space available
+
+	;----------------------------------------------------------
+	; Error cleanup
+	;----------------------------------------------------------
 
 	; No space, so remove context again
 	SYSLOG 18
-	POP ebx
-	CALL context_del
+	POP ebx				; PCB ptr
+	CALL context_del		; ebx is passed thru
 	; eax not checked -> can't do anything about failure
-	MOV DWORD [ebp+44], 0xFFFFFFFF
-	RET
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack
+	RET				; return to interrupt handler
+
+	;----------------------------------------------------------
+	; Cleanup
+	;----------------------------------------------------------
 
 .space_available:
 	; Cleanup (eax passed thru as PCB)
-	MOV DWORD [ebp+44], eax
-	POP eax
+	MOV DWORD [ebp+44], eax		; save eax return code in interrupt stack
+	POP eax				; remove PCB ptr from stack
 	SYSLOG 1
-	RET
+	RET				; return to interrupt handler
 
 ;------------------------------------------------------------------
+; (ONLY FROM USER MODE thru INT)
 ; INPUT
-;   ebx      Function address for new task
-;   ecx      argument
-;   edx      Return address -> pthread_exit()
+;   ebx			Function address for new task
+;   ecx			argument
+;   edx			Return address -> pthread_exit()
 ; RETURN
-;   eax      PID (0xFFFFFFFF on failure)
+;   eax on STACK	PID (0xFFFFFFFF on failure)
 ;------------------------------------------------------------------
 GLOBAL scheduler_newpThread
 scheduler_newpThread:
+	;----------------------------------------------------------
 	; Passthru newTask
-	CALL scheduler_newTask
-	CMP DWORD [ebp+44], 0xFFFFFFFF
-	JE .cleanup
+	;----------------------------------------------------------
 
+	CALL scheduler_newTask				; ebx is passed thru (ecx and edx are lost)
+	CMP DWORD [ebp+44], 0xFFFFFFFF			; eax return code already on interrupt stack
+	JE .cleanup					; newTask failed
+
+	;----------------------------------------------------------
 	; Modify PCB for pThread return
-	MOV ebx, DWORD [eax+PCB.reg_esp]
-	SUB ebx, 12
-	MOV DWORD [eax+PCB.reg_esp], ebx
-	MOV ecx, DWORD [ebp+40]
-	MOV edx, DWORD [ebp+36]
-	PUSH ds
-	MOV eax, DWORD [eax+PCB.reg_ss]
-	MOV ds, ax
-	MOV DWORD [ds:ebx], pThread_exit+0x10000 ; add linear offset (privCS-userCS)
-	MOV DWORD [ds:ebx+4], ecx
-	MOV DWORD [ds:ebx+8], edx
+	;----------------------------------------------------------
+
+	MOV ebx, DWORD [eax+PCB.reg_esp]		; move program stack to ebx
+	SUB ebx, 12					; reserve 3 dwords
+	MOV DWORD [eax+PCB.reg_esp], ebx		; save new stack-top
+	MOV ecx, DWORD [ebp+40]				; restore ecx
+	MOV edx, DWORD [ebp+36]				; restore edx
+	PUSH ds						; save data sagment
+	MOV eax, DWORD [eax+PCB.reg_ss]			; load program stack segment
+	MOV ds, ax					; change data segment to program stack segment
+	MOV DWORD [ds:ebx], pThread_exit+0x10000	; move cleanup code (below) to new programs stack & add linear offset (privCS-userCS)
+	MOV DWORD [ds:ebx+4], ecx			; save original pthread create argument
+	MOV DWORD [ds:ebx+8], edx			; pthread_exit() address
 	POP ds
 
+	;----------------------------------------------------------
 	; pThread prepared
-.cleanup:
-	RET
+	;----------------------------------------------------------
 
-	; pThread return code
+.cleanup:
+	RET						; return to interrupt handler
+
+	;----------------------------------------------------------
+	; pThread return program (usermode code)
+	;----------------------------------------------------------
+
 pThread_exit:
-	ADD esp, 4
-	XCHG eax, DWORD [esp]
-	CALL eax
+	; eax contains pthread function return code
+	ADD esp, 4					; remove original pthread create argument from stack
+	XCHG eax, DWORD [esp]				; get pthread_exit ptr and save eax (thread return code) on stack
+	CALL eax					; Call pthread_exit with return code as parameter
 
 	; Kill task in case of failure
 	MOV eax, SYS_EXIT
@@ -190,52 +213,65 @@ pThread_exit:
 
 ;------------------------------------------------------------------
 ; INPUT
-;   ebx      PID to kill
+;   ebx			PID to kill
 ; RETURN
-;   eax      0 on success
+;   eax on STACK	0 on success
 ; REMARKS
-;   (check that only children can be killed)
+;   (ToDo: check that only children can be killed)
 ;------------------------------------------------------------------
 GLOBAL scheduler_killTask
 scheduler_killTask:
-	; check PID -> disallow killing of PID 0 (idle task)
-	TEST ebx, ebx
-	JNZ .killOK
-	MOV DWORD [ebp+44], 0xFFFFFFFF
+	;----------------------------------------------------------
+	; PID sanity check
+	;----------------------------------------------------------
+
+	TEST ebx, ebx			; check PID -> disallow killing of PID 0 (idle task)
+	JNZ .killOK			; PID not 0 -> continue
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack
 	RET
 .killOK:
 
-	; Search PCB for PID
-	PUSH ebx
-	CALL sched_find
+	;----------------------------------------------------------
+	; Search thru PCBs for PID
+	;----------------------------------------------------------
 
-	; Found something?
-	TEST eax, eax
-	JNZ .found
-	MOV DWORD [ebp+44], 0xFFFFFFFF
+	PUSH ebx			; move PID to stack as parameter
+	CALL sched_find			; C function overwrites registers
+	TEST eax, eax			; Found something?
+	JNZ .found			; found a PCB
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack
 	SYSLOG 2
-	JMP .cleanup
+	JMP .cleanup			; did not find anything
 
+	;----------------------------------------------------------
 	; Kill found task
-.found:
-	MOV ebx, eax
-	CALL context_del
-	TEST eax, eax
-	MOV DWORD [ebp+44], 0xFFFFFFFF
-	JNZ .cleanup
+	;----------------------------------------------------------
 
+.found:
+	MOV ebx, eax			; PCB ptr
+	CALL context_del		; delete context
+	TEST eax, eax			; check if it worked
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack
+	JNZ .cleanup			; unable to delete context -> let it be rescheduled
+
+	;----------------------------------------------------------
 	; Erase task from queue
-	CALL sched_remove
-	TEST eax, eax
-	MOV DWORD [ebp+44], 0
-	JNZ .cleanup
-	MOV DWORD [ebp+44], 0xFFFFFFFF
+	;----------------------------------------------------------
+
+	CALL sched_remove		; Remove PCB from scheduler (PID still on stack as argument)
+	TEST eax, eax			; check if it worked
+	MOV DWORD [ebp+44], 0		; save eax return code in interrupt stack
+	JNZ .cleanup			; if it worked
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack (cannot do anything else)
 	SYSLOG 2
-	
+
+	;----------------------------------------------------------
 	; Cleanup
+	;----------------------------------------------------------
+
 .cleanup:
-	ADD esp, 4
-	RET
+	ADD esp, 4			; remove parameter from stack
+	RET				; return to interrupt handler
 
 ;------------------------------------------------------------------
 ; (ONLY FROM USER MODE thru INT)
@@ -246,36 +282,44 @@ scheduler_killTask:
 ;------------------------------------------------------------------
 GLOBAL scheduler_exit
 scheduler_exit:
+	;----------------------------------------------------------
 	; Get current PID and set next task as active
-	CALL sched_getPIDinactive
-	PUSH eax
-	PUSH DWORD 0
-	CALL sched_next
-	ADD esp, 4
+	;----------------------------------------------------------
 
+	CALL sched_getPIDinactive	; C function overwrites registers
+	PUSH eax			; Save PID
+	PUSH DWORD 0			; dummy value for current execution time -> task will be killed anyways
+	CALL sched_next			; C function overwrites registers, select next PCB
+	ADD esp, 4			; Remove parameter from stack
+
+	;----------------------------------------------------------
 	; Call kill procedure
-	POP ebx
-	PUSH eax
-	CALL scheduler_killTask
+	;----------------------------------------------------------
 
-	; Check if it worked
-	CMP DWORD [ebp+44], 0
-	JNE .error
+	POP ebx				; Get PID -> passthru to killTask
+	PUSH eax			; Save next PCB
+	CALL scheduler_killTask		; ebx is passed thru
+	CMP DWORD [ebp+44], 0		; Check if it worked
+	JNE .error			; if task could not be killed
 
-	; Reconfigure PIT -> resets counter so the next task isn't handicapped
-	RESET_PIT
+	;----------------------------------------------------------
+	; Prepare for next task
+	;----------------------------------------------------------
 
-	; Set next task
-	POP eax
+	RESET_PIT			; Reconfigure PIT -> resets counter so the next task isn't handicapped
+	POP eax				; Restore new PCB value
 	SYSLOG 4
-	JMP context_set
+	JMP context_set			; Set next task -> eax is passed thru
 
+	;----------------------------------------------------------
 	; Halt system in case of error
+	;----------------------------------------------------------
+
 .error:
 	SYSLOG 5
-	CLI
-	HLT
-	JMP .error
+	CLI				; Clear interrupt flag
+	HLT				; Halt system until interrupt -> should never occur
+	JMP .error			; loop endlessly
 
 ;------------------------------------------------------------------
 ; (ONLY FROM USER MODE thru INT)
@@ -286,98 +330,120 @@ scheduler_exit:
 ;------------------------------------------------------------------
 GLOBAL scheduler_yield
 scheduler_yield:
+	;----------------------------------------------------------
 	; Calculate execution time
-	PUSHFD
-	CLI
-	XOR eax, eax
+	;----------------------------------------------------------
+
+	PUSHFD			; Save flags
+	CLI			; disable interrupts just in case
+	XOR eax, eax		; Set eax to null
 	MOV ebx, PRESCALER
-	MOV al, 0x00 ; Channel 0 read count in latch
-	OUT 0x43, al
-	IN al, 0x40
-	SHL ax, 8
-	IN al, 0x40
-	ROL ax, 8
-	CMP eax, PRESCALER
-	JBE .no_overflow
-	XOR eax, eax
+	MOV al, 0x00		; Channel 0 read count in latch
+	OUT 0x43, al		; Write select command
+	IN al, 0x40		; read low byte
+	SHL ax, 8		; shift to high
+	IN al, 0x40		; read high byte
+	ROL ax, 8		; rollover high to low byte
+	CMP eax, ebx		; compare current value to max value 
+	JBE .no_overflow	; check for underflow
+	XOR eax, eax		; set eax to zero in case of underflow
 .no_overflow:
-	SUB ebx, eax
-	POPFD
+	SUB ebx, eax		; subtract remaining time (eax) from max value
+	POPFD			; restore flags
 
-	; Reconfigure PIT -> resets counter on timer interrupt
-	; and on active yield so the next task handicapped
-	RESET_PIT
+	;----------------------------------------------------------
+	; Reconfigure PIT
+	;----------------------------------------------------------
 
+	RESET_PIT		; resets counter on timer interrupt and on active yield so the next task handicapped
+
+	;----------------------------------------------------------
 	; Search current and next PCB & update active
-	PUSH ebx
-	CALL sched_getPCB
-	POP ebx
-	PUSH eax
-	PUSH ebx
-	CALL sched_next
-	ADD esp, 4
-	POP ebx
+	;----------------------------------------------------------
 
+	PUSH ebx		; Save ticks on stack
+	CALL sched_getPCB	; C function overwrites registers
+	POP ebx			; Restore ticks from stack
+	PUSH eax		; Save current PCB ptr
+	PUSH ebx		; Move parameter ticks to stack
+	CALL sched_next		; C function overwrites registers
+	ADD esp, 4		; Remove argument from stack
+	POP ebx			; Restore current PCB ptr
+
+	;----------------------------------------------------------
 	; Switch context
+	;----------------------------------------------------------
+
 	SYSLOG 6
-	JMP context_switch
+	JMP context_switch	; Jump to context switch eax & ebx are passed thru
 
 ;------------------------------------------------------------------
 ; (ONLY FROM USER MODE thru INT)
 ; INPUT
-;   ebx      PID to wait for
+;   ebx			PID to wait for
 ; RETURN
 ;   via context_switch
-;   eax      0xFFFFFFFF on failure
+;   eax on STACK	0xFFFFFFFF on failure
 ;------------------------------------------------------------------
 GLOBAL scheduler_waitpid
 scheduler_waitpid:
+	;----------------------------------------------------------
 	; Calculate execution time
-	PUSH ebx
-	PUSHFD
-	CLI
-	XOR eax, eax
+	;----------------------------------------------------------
+
+	PUSH ebx			; Save PID
+	PUSHFD				; Save flags
+	CLI				; disable interrupts just in case
+	XOR eax, eax			; Set eax to null
 	MOV edx, PRESCALER
-	MOV al, 0x00 ; Channel 0 read count in latch
-	OUT 0x43, al
-	IN al, 0x40
-	SHL ax, 8
-	IN al, 0x40
-	ROL ax, 8
-	CMP eax, PRESCALER
-	JBE .no_overflow
-	XOR eax, eax
+	MOV al, 0x00			; Channel 0 read count in latch
+	OUT 0x43, al			; Write select command
+	IN al, 0x40			; read low byte
+	SHL ax, 8			; shift to high
+	IN al, 0x40			; read high byte
+	ROL ax, 8			; rollover high to low byte
+	CMP eax, edx			; compare current value to max value 
+	JBE .no_overflow		; check for underflow
+	XOR eax, eax			; set eax to zero in case of underflow
 .no_overflow:
-	SUB edx, eax
-	POPFD
+	SUB edx, eax			; subtract remaining time (eax) from max value
+	POPFD				; restore flags
 
-	; Reconfigure PIT -> resets counter on timer interrupt
-	; and on active yield so the next task handicapped
-	RESET_PIT
+	;----------------------------------------------------------
+	; Reconfigure PIT
+	;----------------------------------------------------------
 
+	RESET_PIT			; resets counter on timer interrupt and on active yield so the next task handicapped
+
+	;----------------------------------------------------------
 	; Search current and next PCB & update active
-	PUSH edx
-	CALL sched_getPCB
-	POP edx
-	POP ebx
-	PUSH eax
-	PUSH ebx
-	PUSH edx
-	CALL sched_block
-	TEST eax, eax
-	JNZ .switch
-	MOV DWORD [ebp+44], 0xFFFFFFFF
-	CALL sched_next
+	;----------------------------------------------------------
+
+	PUSH edx			; Save ticks on stack
+	CALL sched_getPCB		; C function overwrites registers
+	POP edx				; Restore ticks from stack
+	POP ebx				; Restore PID
+	PUSH eax			; Save current PCB ptr
+	PUSH ebx			; Move parameter PID to stack
+	PUSH edx			; Move parameter ticks to stack
+	CALL sched_block		; C function overwrites registers
+	TEST eax, eax			; Check if wait is possible
+	JNZ .switch			; it worked
+	MOV DWORD [ebp+44], 0xFFFFFFFF	; save eax error code in interrupt stack
+	CALL sched_next			; C function overwrites registers -> normal scheduling
 	SYSLOG 6, "BLFa"
 	JMP .switch2
 .switch:
 	SYSLOG 6, "BLCK"
 .switch2:
-	ADD esp, 8
-	POP ebx
+	ADD esp, 8			; Restore stack
+	POP ebx				; Restore current PCB ptr
 
+	;----------------------------------------------------------
 	; Switch context
-	JMP context_switch
+	;----------------------------------------------------------
+
+	JMP context_switch		; Jump to context switch eax & ebx are passed thru
 
 ;------------------------------------------------------------------
 ; INPUT
@@ -387,47 +453,59 @@ scheduler_waitpid:
 ;------------------------------------------------------------------
 GLOBAL scheduler_start
 scheduler_start:
+	;----------------------------------------------------------
 	; Setup idle task
-	MOV ebx, idle_task+0x10000 ; add linear offset (privCS-userCS)
-	CALL context_new
-	TEST eax, eax
-	JNZ .success
+	;----------------------------------------------------------
+
+	MOV ebx, idle_task+0x10000	; add linear offset (privCS-userCS)
+	CALL context_new		; create new context -> ebx is passed thru
+	TEST eax, eax			; check if it worked
+	JNZ .success			; if it did
 
 	; Error creating idle PCB -> critical error
 	SYSLOG 17, "IDLE"
-	CLI
-	HLT
-	JMP $
+	CLI				; Clear interrupt flag
+	HLT				; Halt system until interrupt -> should never occur
+	JMP $				; loop endlessly
 .success:
 
-	; idle task modification
-	PUSH eax
-	CALL setup_idle
-	ADD esp, 4
-	TEST eax, eax
-	JZ .idle_setup
+	;----------------------------------------------------------
+	; Idle task modification
+	;----------------------------------------------------------
 
-	; Error storing idle PCB -> critical error
+	PUSH eax			; Move PCB ptr to stack as parameter
+	CALL setup_idle			; C function overwrites registers
+	ADD esp, 4			; Remove parameter from stack
+	TEST eax, eax			; check if it worked
+	JZ .idle_setup			; if it did
+
+	; Error modifying idle PCB -> critical error
 	SYSLOG 18, "IDLE"
-	CLI
-	HLT
-	JMP $
+	CLI				; Clear interrupt flag
+	HLT				; Halt system until interrupt -> should never occur
+	JMP $				; loop endlessly
 .idle_setup:
 
-	; Configure PIT
+	;----------------------------------------------------------
+	; Configure PIT for the first time
+	;----------------------------------------------------------
+
 	RESET_PIT
 
+	;----------------------------------------------------------
 	; Set first active
-	PUSH DWORD 0
-	CALL sched_next
-	ADD esp, 4
+	;----------------------------------------------------------
+
+	PUSH DWORD 0			; dummy value for current execution time -> task will be killed anyways
+	CALL sched_next			; C function overwrites registers, selct next PCB
+	ADD esp, 4			; Remove parameter from stack
 	SYSLOG 8
-	JMP context_set
+	JMP context_set			; Set next task -> eax is passed thru
 
 ;------------------------------------------------------------------
 ; Idle Task -> just yielding to next task
 ; Normally resides in privCS but is called with userCS, so
-; different offset needs to be calculated
+; different offset need to be calculated
 ;------------------------------------------------------------------
 idle_task:
 	SYSLOG 15

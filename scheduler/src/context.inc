@@ -41,7 +41,7 @@ EXTERN context_switch
 ; INPUT
 ;   eax      Pointer to new PCB
 ; RETURN
-;   none
+;   none -> go to interrupt for IRET
 ;------------------------------------------------------------------
 EXTERN context_set
 

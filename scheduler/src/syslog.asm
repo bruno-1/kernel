@@ -2,6 +2,7 @@
 ; syslog.asm
 ;
 ; Simple interrupt function to log data to memory
+; Logged data at ds:0x800000 -> physical address 0x820000
 ;
 ; INT 0x80
 ; eax = 103
@@ -39,7 +40,7 @@ SECTION .data
 ;------------------------------------------------------------------
 
 ; message strings
-string_00 db ""
+string_00 db "" ; dummy value
 string_01 db "-- Created new task"
 string_02 db "-- Failed to kill task"
 string_03 db "-- Killed task"
@@ -103,9 +104,13 @@ EXTERN privDS
 ; P U B L I C   F U N C T I O N S
 ;------------------------------------------------------------------
 
+; Interrupt service routine for syslogging
 GLOBAL syslog
 syslog:
-	; Interrupt service routine for syslogging
+	;----------------------------------------------------------
+	; Save registers
+	;----------------------------------------------------------
+
 	PUSHAD
 
 	; Save segment registers (might come here form userland)
@@ -113,97 +118,123 @@ syslog:
 	PUSH es
 	PUSH gs
 	PUSH fs
+
+	; Restore privileged data-segments
 	MOV cx, privDS
 	MOV ds, cx
 	MOV es, cx
 	MOV gs, cx
 	MOV fs, cx
-	MOV ebp, esp
+	MOV ebp, esp			; Prepare stack base pointer
 
+	;----------------------------------------------------------
 	; Sanity check message parameter
+	;----------------------------------------------------------
+
 	CMP edx, ((stringlength-stringtable)/4)-1
-	JA .end_int ; edx greater than highest message id
+	JA .end_int			; edx greater than highest message id
 
-	; Load string and length
-	MOV eax, DWORD [stringtable+4*edx]
-	MOV ecx, DWORD [stringlength+4*edx]
+	;----------------------------------------------------------
+	; Load string and its length
+	;----------------------------------------------------------
+
+	MOV esi, DWORD [stringtable+4*edx]	; string
+	MOV ecx, DWORD [stringlength+4*edx]	; length
 	TEST ecx, ecx
-	JZ .end_int ; string length is zero
-	INC ecx ; newline
+	JZ .end_int			; string length is zero
+	INC ecx				; add newline to length
 
-	; Add parameter to string
+	;----------------------------------------------------------
+	; Add parameter to string length
+	;----------------------------------------------------------
+
 	TEST edi, edi
-	JZ .no_param
-	ADD ecx, 5
+	JZ .no_param			; parameter is zero
+	ADD ecx, 5			; add parameter length + space to stringlength
 .no_param:
 
-	; ADD PID if we came from userland
+	;----------------------------------------------------------
+	; ADD PID (if we came from userland)*-> or always depending on MACRO
+	;----------------------------------------------------------
+
 %IFNDEF PID_ALL
-	TEST DWORD [ebp+52], 3 ; true on Ring 1-3
-	JZ .no_user
+	TEST DWORD [ebp+52], 3		; true on Ring 1-3
+	JZ .no_user			; Ring 0 -> no PID
 %ENDIF
-	ADD ecx, 10
+	ADD ecx, 10			; add maximum uint32 decimal representation length
 .no_user:
 
+	;----------------------------------------------------------
 	; Reserve memory for logging (synchronized)
+	;----------------------------------------------------------
+
 .lock_ptr_start:
-	LOCK BTS DWORD [lock_ptr], 0
-	JNC .lock_ptr_finish
+	LOCK BTS DWORD [lock_ptr], 0	; check and possibly lock
+	JNC .lock_ptr_finish		; if successfully locked
 .lock_ptr_loop:
-	PAUSE
-	TEST DWORD [lock_ptr], 1
-	JNZ .lock_ptr_loop
-	JMP .lock_ptr_start
+	PAUSE				; wait
+	TEST DWORD [lock_ptr], 1	; check if still locked
+	JNZ .lock_ptr_loop		; yes
+	JMP .lock_ptr_start		; no
 .lock_ptr_finish:
-	MOV edx, DWORD [curr_ptr]
-	ADD edx, ecx
-	CMP edx, ENDPOS
-	JA .end_int
-	SUB edx, ecx
-	ADD DWORD [curr_ptr], ecx
-	MOV DWORD [lock_ptr], 0
+	MOV edx, DWORD [curr_ptr]	; load dest ptr
+	ADD edx, ecx			; add stringlength
+	CMP edx, ENDPOS			; check if syslog memory is all used up
+	JA .end_int			; yes -> no logging (lock not released)
+	SUB edx, ecx			; restore original dest logging ptr
+	ADD DWORD [curr_ptr], ecx	; add stringlength to global ptr
+	MOV DWORD [lock_ptr], 0		; release lock
 
+	;----------------------------------------------------------
 	; Process parameter
-	MOV BYTE [edx+ecx-1], NEWLINE
-	DEC ecx
-	TEST edi, edi
-	JZ .user_check
-	SUB ecx, 5
-	MOV BYTE [edx+ecx], ' '
-	MOV DWORD [edx+ecx+1], edi
+	;----------------------------------------------------------
 
-	; Add PID from Userland
+	MOV BYTE [edx+ecx-1], NEWLINE	; store newline to end of string
+	DEC ecx				; sub length
+	TEST edi, edi			; check if parameter exists
+	JZ .user_check			; no
+	SUB ecx, 5			; subtract parameter length from string length
+	MOV BYTE [edx+ecx], ' '		; move space seperator
+	MOV DWORD [edx+ecx+1], edi	; move parameter to dest
+
+	;----------------------------------------------------------
+	; Add PID from userland
+	;----------------------------------------------------------
+
 .user_check:
+	MOV edi, edx			; Copy destination ptr
 %IFNDEF PID_ALL
-	TEST DWORD [ebp+52], 3 ; true on Ring 1-3
-	JZ .next_char
+	TEST DWORD [ebp+52], 3		; true on Ring 1-3
+	JZ .next_char			; Ring 0 -> skip to message logging
 %ENDIF
-	PUSH eax
-	PUSH ecx
-	PUSH edx
-	CALL sched_getPID
-	POP edx
-	POP ecx
-	MOV edi, edx
-	ADD edx, 10
-	SUB ecx, 10
-	PUSH ecx
-	MOV cx, 0x010A
+	PUSH eax			; Save string ptr
+	PUSH ecx			; Save string length
+	PUSH edi			; Save destination ptr
+	CALL sched_getPID		; cdecl-Call
+	POP edi				; Restore destination ptr
+	POP ecx				; Restore length
+	SUB ecx, 10			; Subtract PID length
+	PUSH ecx			; Save langth
+	MOV cx, 0x010A			; Conversion params
 	CALL uint32_to_dec
-	POP ecx
-	POP eax
+	ADD edi, 10			; advance destination ptr
+	POP ecx				; Restore string length
+	POP eax				; Restore string ptr
 
+	;----------------------------------------------------------
 	; Actual logging
-.next_char:
-	MOV bl, BYTE [eax]
-	MOV BYTE [edx], bl
-	INC eax
-	INC edx
-	DEC ecx
-	JNZ .next_char
+	;----------------------------------------------------------
 
-	; End Interrupt
+.next_char:
+	CLD				; Process copy upwards
+	REP MOVSB			; Move byte from ds:esi to es:edi and decrement ecx
+
+	;----------------------------------------------------------
+	; End of interrupt
+	;----------------------------------------------------------
+
 .end_int:
+	; Restore saved registers
 	POP fs
 	POP gs
 	POP es
