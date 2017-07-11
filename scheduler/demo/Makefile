@@ -10,7 +10,7 @@ AR          = ar
 LD          = ld
 NASM        = nasm
 NASMOPT     = -g -f elf -F dwarf -I./syscall/
-CFLAGS      = -m32 -Wall -Werror -g -O1 -std=c99 -fno-stack-protector
+CFLAGS      = -m32 -Wall -Werror -g -O1 -std=c99 -fno-stack-protector -D__DHBW__=1
 GLDFLAGS    = -melf_i386 --warn-common --fatal-warnings
 PS2PDF      = ps2pdf
 A2PS        = a2ps

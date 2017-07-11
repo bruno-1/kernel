@@ -1,5 +1,5 @@
 ;-----------------------------------------------------------------
-; pthreads.asm
+; libpthread.asm
 ;
 ; Custom pThreads implementation for custom scheduler
 ;
@@ -208,6 +208,39 @@ pthread_self:
 
 	MOV eax, SYS_GETPID
 	INT 0x80
+
+	;----------------------------------------------------------
+	; Cleanup
+	;----------------------------------------------------------
+
+.cleanup:
+	POP ebp			; Leave stackframe
+	RET			; eax is passed thru as return value
+
+;------------------------------------------------------------------
+; G e t   o w n   p T h r e a d   I D
+;------------------------------------------------------------------
+GLOBAL pthread_yield
+pthread_yield:
+	;----------------------------------------------------------
+	; Save registers
+	;----------------------------------------------------------
+
+	PUSH ebp		; Create stackframe
+	MOV ebp, esp		; Prepare base pointer
+
+	;----------------------------------------------------------
+	; Syscall to get self PID
+	;----------------------------------------------------------
+
+	MOV eax, SYS_YIELD
+	INT 0x80
+
+	;----------------------------------------------------------
+	; Prepare return value
+	;----------------------------------------------------------
+
+	XOR eax, eax		; Function always succedes
 
 	;----------------------------------------------------------
 	; Cleanup

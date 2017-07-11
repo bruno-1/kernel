@@ -5,6 +5,7 @@
 ////////////////
 
 typedef unsigned long pthread_t;
+typedef void pthread_attr_t;
 
 /////////////////////////
 // Function Prototypes //
@@ -24,4 +25,7 @@ int pthread_join(pthread_t thread, void **value_ptr);
 
 // Get own pThread ID
 pthread_t pthread_self(void);
+
+// Yield to other pThreads
+int pthread_yield(void);
 

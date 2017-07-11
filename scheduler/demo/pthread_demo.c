@@ -1,11 +1,24 @@
 // pthread_demo.c: First tests for custom pthreads library
 
+/////////////////
+// Definitions //
+/////////////////
+
+// pthread_yield is non-standard -> only implemented in DHBW kernel
+#ifdef __DHBW__
+#define sched_yield() pthread_yield()
+#endif
+
 ////////////
 // Header //
 ////////////
 
-#include <pthread.h>
 #include <unistd.h>
+#ifdef __DHBW__
+#include "pthreads.h" // custom Header for pthread_yield
+#else
+#include <pthread.h> // original Header without pthread_yield
+#endif
 
 ///////////////////////
 // Globale Variablen //
@@ -24,7 +37,7 @@ void* threadA(void* arg)
 	char argument = ((char)(((int)arg) % 10)) + '0';
 
 	// Print & log something
-	char str[] = "Thread S: X";
+	char str[] = "Thread O: X";
 	str[10] = argument;
 	int num = 0;
 	num = write(0, str+7, sizeof(str)-7);
@@ -34,7 +47,7 @@ void* threadA(void* arg)
 	return arg;
 }
 
-// Print in Endless loop
+// Print in endless loop
 void* threadB(void* arg)
 {
 	// Prepare argument
@@ -57,8 +70,31 @@ void* threadB(void* arg)
 	return arg;
 }
 
-// Print in a long loop
+// Print in yielding loop
 void* threadC(void* arg)
+{
+	// Prepare argument
+	char argument = ((char)(((int)arg) % 10)) + '0';
+
+	// Yielding loop
+	char str[] = "Thread Y: X";
+	str[10] = argument;
+	int num = 0;
+	for(int j=0; j<5; ++j) {
+		// Print & log something
+		num += write(0, str+7, sizeof(str)-7);
+		num += write(1, str, sizeof(str));
+
+		// Yield to other tasks (standard function)
+		num += sched_yield();
+	}
+
+	// End it
+	return arg;
+}
+
+// Print in a long loop
+void* threadD(void* arg)
 {
 	// Prepare argument
 	char argument = ((char)(((int)arg) % 10)) + '0';
@@ -88,7 +124,7 @@ void* threadC(void* arg)
 }
 
 // Print argument (PID)
-void* threadD(void* arg)
+void* threadE(void* arg)
 {
 	// Prepare argument
 	char argument = ((char)((*((int*)arg)) % 10)) + '0';
@@ -106,14 +142,14 @@ void* threadD(void* arg)
 }
 
 // Synchronize
-void* threadE(void* arg)
+void* threadF(void* arg)
 {
 	// Prepare argument
 	int param = (int)arg;
 	char argument = ((char)(((int)arg) % 10)) + '0';
 
 	// Print & log something
-	char str1[] = "Thread Ys X";
+	char str1[] = "Thread Ss X";
 	str1[10] = argument;
 	int num = 0;
 	num += write(0, str1+7, sizeof(str1)-7);
@@ -125,7 +161,7 @@ void* threadE(void* arg)
 	// Two options
 	if(param == 0) {
 		// Long loop
-		char str[] = "Thread Ym X";
+		char str[] = "Thread Sm X";
 		str[10] = argument;
 		for(int j=0; j<5; ++j) {
 			// Print & log something
@@ -146,7 +182,7 @@ void* threadE(void* arg)
 	}
 	else {
 		// Wait for sync
-		char str[] = "Thread Ym X";
+		char str[] = "Thread Sm X";
 		str[10] = argument;
 		while(!my_sync) {
 			// Print & log something
@@ -159,7 +195,7 @@ void* threadE(void* arg)
 	}
 
 	// Print & log something
-	char str2[] = "Thread Ye X";
+	char str2[] = "Thread Se X";
 	str2[10] = argument;
 	num += write(0, str2+7, sizeof(str2)-7);
 	num += write(1, str2, sizeof(str2));
@@ -172,20 +208,21 @@ void* threadE(void* arg)
 int main(int argc, char* argv[])
 {
 	// Create threads
-	pthread_t t[6];
-	int ret[6];
+	pthread_t t[9];
+	int ret[9];
 	ret[0] = pthread_create(&t[0], 0, &threadA, (void*)1);
 	ret[1] = pthread_create(&t[1], 0, &threadA, (void*)2);
 	ret[2] = pthread_create(&t[2], 0, &threadB, (void*)3);
 	ret[3] = pthread_create(&t[3], 0, &threadC, (void*)4);
-	ret[4] = pthread_create(&t[4], 0, &threadC, (void*)5);
-	ret[5] = pthread_create(&t[5], 0, &threadD, (void*)&t[5]);
-	ret[6] = pthread_create(&t[6], 0, &threadE, (void*)0);
-	ret[7] = pthread_create(&t[7], 0, &threadE, (void*)1);
+	ret[4] = pthread_create(&t[4], 0, &threadD, (void*)5);
+	ret[5] = pthread_create(&t[5], 0, &threadD, (void*)6);
+	ret[6] = pthread_create(&t[6], 0, &threadE, (void*)&t[6]);
+	ret[7] = pthread_create(&t[7], 0, &threadF, (void*)0);
+	ret[8] = pthread_create(&t[8], 0, &threadF, (void*)1);
 
 	// Print something if pthread_create failed
 	int num = 0;
-	for(int i=0; i<8; ++i) {
+	for(int i=0; i<9; ++i) {
 		if(ret[0] != 0) {
 			const char result[] = "Unable to create thread!";
 			num += write(1, result, sizeof(result));
@@ -200,11 +237,11 @@ int main(int argc, char* argv[])
 	// Waste some time
 	for(volatile int i=0; i<0x7FFFFF; ++i);
 
-	// Wait for thread 3
+	// Wait for thread 4
 	const char join[] = "TryJoin";
 	num += write(0, join, sizeof(join));
 	num += write(1, join, sizeof(join));
-	if(pthread_join(t[3], 0) == 0) {
+	if(pthread_join(t[4], 0) == 0) {
 		const char result[] = "Successful Join";
 		num += write(0, result, sizeof(result));
 		num += write(1, result, sizeof(result));
@@ -233,10 +270,10 @@ int main(int argc, char* argv[])
 	// Waste some more time
 	for(volatile int i=0; i<0x7FFFFF; ++i);
 
-	// Wait for thread 4 -> should already have ended
+	// Wait for thread 5 -> should already have ended
 	num += write(0, join, sizeof(join));
 	num += write(1, join, sizeof(join));
-	if(pthread_join(t[4], 0) == 0) {
+	if(pthread_join(t[5], 0) == 0) {
 		const char result[] = "Failed not Joining";
 		num += write(0, result, sizeof(result));
 		num += write(1, result, sizeof(result));
@@ -248,6 +285,6 @@ int main(int argc, char* argv[])
 	}
 
 	// That's it
-	return ret[0]+ret[1]+ret[2]+ret[3]+ret[4]+ret[5]+ret[6]+ret[7];
+	return ret[0]+ret[1]+ret[2]+ret[3]+ret[4]+ret[5]+ret[6]+ret[7]+ret[8];
 }
 
