@@ -218,7 +218,7 @@ pthread_self:
 	RET			; eax is passed thru as return value
 
 ;------------------------------------------------------------------
-; G e t   o w n   p T h r e a d   I D
+; Y i e l d   t o   o t h e r   p T h r e a d s
 ;------------------------------------------------------------------
 GLOBAL pthread_yield
 pthread_yield:
