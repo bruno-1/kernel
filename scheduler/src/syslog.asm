@@ -180,7 +180,10 @@ syslog:
 	MOV edx, DWORD [curr_ptr]	; load dest ptr
 	ADD edx, ecx			; add stringlength
 	CMP edx, ENDPOS			; check if syslog memory is all used up
-	JA .end_int			; yes -> no logging (lock not released)
+	JBE .lock_update		; no -> continue logging
+	MOV DWORD [lock_ptr], 0		; release lock
+	JMP .end_int			; yes -> no logging
+.lock_update:
 	SUB edx, ecx			; restore original dest logging ptr
 	ADD DWORD [curr_ptr], ecx	; add stringlength to global ptr
 	MOV DWORD [lock_ptr], 0		; release lock

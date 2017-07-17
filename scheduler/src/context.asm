@@ -134,9 +134,8 @@ context_new:
 	MOV DWORD [eax+PCB.reg_eip], ebx
 	MOV DWORD [eax+PCB.reg_cs], userCS
 
-	; Flags -> don't know -> copy flags of interrupted program
-	MOV ebx, DWORD [ebp+64]
-	MOV DWORD [eax+PCB.reg_eflags], ebx
+	; Flags -> IF & bit1 set
+	MOV DWORD [eax+PCB.reg_eflags], 0x00000202
 
 	; Setup stack (except ss)
 	MOV DWORD [eax+PCB.stack], edx		; stack bottom
